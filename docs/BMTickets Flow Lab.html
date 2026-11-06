@@ -1,0 +1,1529 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>BMTickets Flow Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: signal-board console — tab rail of patterns, a live schematic stage, and a side column of narration + code pointers. */
+:root{
+  color-scheme: dark;
+  --bg:#0b111b; --panel:#111a28; --panel-2:#16212f; --line:#24324a; --line-2:#33445f;
+  --fg:#e3eaf4; --muted:#8c9bb2; --node:#142033;
+  --req:#5cc8ff; --ok:#3ddc97; --warn:#ffb547; --err:#ff5d6c; --evt:#b48cff; --data:#7fd1c4;
+  --glow:0.55;
+  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body:"Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){
+  color-scheme: light;
+  --bg:#eef2f7; --panel:#ffffff; --panel-2:#f5f8fc; --line:#cfd8e5; --line-2:#b5c2d4;
+  --fg:#122033; --muted:#566781; --node:#ffffff;
+  --req:#0577b8; --ok:#0f8a57; --warn:#b06a00; --err:#cf2d40; --evt:#6a43d1; --data:#0f7f72; --glow:0.25;
+}}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --bg:#eef2f7; --panel:#ffffff; --panel-2:#f5f8fc; --line:#cfd8e5; --line-2:#b5c2d4;
+  --fg:#122033; --muted:#566781; --node:#ffffff;
+  --req:#0577b8; --ok:#0f8a57; --warn:#b06a00; --err:#cf2d40; --evt:#6a43d1; --data:#0f7f72; --glow:0.25;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1360px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(26px,3.4vw,38px);line-height:1.1;margin:4px 0 0;text-wrap:balance}
+h1 em{font-style:normal;color:var(--req)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+nav.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+nav.tabs button{flex:0 0 auto;font:500 14px var(--f-body);color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer;white-space:nowrap}
+nav.tabs button:hover{color:var(--fg);border-color:var(--line-2)}
+nav.tabs button[aria-selected="true"]{color:var(--bg);background:var(--req);border-color:var(--req)}
+nav.tabs button:focus-visible, .ctl button:focus-visible, .ctl input:focus-visible, .seg button:focus-visible{outline:2px solid var(--req);outline-offset:2px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+@media (max-width: 1000px){ .grid{grid-template-columns:minmax(0,1fr)} }
+.stagecard{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}
+.stagehead{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between;padding:14px 16px 0}
+.stagehead h2{font-family:var(--f-display);font-weight:600;font-size:21px;margin:0}
+.stagehead p{margin:0;color:var(--muted);font-size:14px;max-width:70ch}
+.stage-scroll{overflow-x:auto}
+svg#stage{display:block;width:100%;min-width:700px;height:auto}
+.bar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:12px 16px;border-top:1px solid var(--line);background:var(--panel-2)}
+.transport{display:flex;gap:6px;align-items:center}
+.btn{font:500 13px var(--f-body);color:var(--fg);background:var(--panel);border:1px solid var(--line-2);border-radius:8px;padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--req)}
+.btn.primary{background:var(--req);border-color:var(--req);color:var(--bg)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.ctl{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.ctl label{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.ctl input[type=range]{width:110px;accent-color:var(--req)}
+.ctl output{font-family:var(--f-mono);font-size:12px;color:var(--fg);min-width:3ch}
+.seg{display:inline-flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
+.seg button{font:500 12px var(--f-body);background:var(--panel);color:var(--muted);border:0;padding:6px 10px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.sep{width:1px;height:22px;background:var(--line-2)}
+.side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.card h3{font:600 12px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+#now-title{font-family:var(--f-display);font-weight:600;font-size:18px;line-height:1.25;margin:0 0 4px}
+#now-body{margin:0;color:var(--muted);font-size:14px}
+#log{list-style:none;margin:0;padding:0;max-height:260px;overflow-y:auto;font-family:var(--f-mono);font-size:12px;display:flex;flex-direction:column;gap:4px}
+#log li{display:grid;grid-template-columns:52px minmax(0,1fr);gap:8px;padding:3px 0;border-bottom:1px dashed var(--line)}
+#log time{color:var(--muted);font-variant-numeric:tabular-nums}
+#log .t-ok{color:var(--ok)} #log .t-warn{color:var(--warn)} #log .t-err{color:var(--err)} #log .t-evt{color:var(--evt)} #log .t-req{color:var(--req)}
+.refs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:13px}
+.refs code{font-family:var(--f-mono);font-size:12px;color:var(--req);word-break:break-all}
+.refs span{display:block;color:var(--muted)}
+.cfg{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;font-size:13px;margin:0}
+.cfg dt{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.cfg dd{margin:0;font-variant-numeric:tabular-nums}
+/* ---------- SVG ---------- */
+.edge{fill:none;stroke:var(--line-2);stroke-width:1.4;opacity:.65}
+.edge.on{stroke:var(--req);opacity:1;stroke-width:2;stroke-dasharray:6 6;animation:dash .6s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-12}}
+.node rect.box{fill:var(--node);stroke:var(--line-2);stroke-width:1.4;transition:stroke .2s, filter .2s}
+.node.k-gw rect.box{stroke:var(--req)}
+.node.k-data rect.box{stroke:var(--data)}
+.node.k-bus rect.box{stroke:var(--evt)}
+.node.k-ext rect.box{stroke-dasharray:4 3}
+.node.k-client rect.box{fill:var(--panel-2)}
+.node[data-state="ok"] rect.box{stroke:var(--ok);stroke-width:2.4;filter:drop-shadow(0 0 8px color-mix(in srgb, var(--ok) calc(var(--glow)*100%), transparent))}
+.node[data-state="warn"] rect.box{stroke:var(--warn);stroke-width:2.4;filter:drop-shadow(0 0 8px color-mix(in srgb, var(--warn) calc(var(--glow)*100%), transparent))}
+.node[data-state="err"] rect.box{stroke:var(--err);stroke-width:2.4;filter:drop-shadow(0 0 8px color-mix(in srgb, var(--err) calc(var(--glow)*100%), transparent))}
+.node[data-state="busy"] rect.box{stroke:var(--req);stroke-width:2.4;filter:drop-shadow(0 0 8px color-mix(in srgb, var(--req) calc(var(--glow)*100%), transparent))}
+.n-t{font:600 14px var(--f-body);fill:var(--fg)}
+.n-s{font:400 11px var(--f-mono);fill:var(--muted)}
+.n-k{font:500 9.5px var(--f-mono);fill:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.pk circle{stroke:var(--bg);stroke-width:2}
+.pk-req circle{fill:var(--req)} .pk-ok circle{fill:var(--ok)} .pk-warn circle{fill:var(--warn)} .pk-err circle{fill:var(--err)} .pk-evt circle{fill:var(--evt)}
+.pk-l{font:500 10.5px var(--f-mono);paint-order:stroke;stroke:var(--bg);stroke-width:3px;stroke-linejoin:round;text-anchor:middle}
+.pk-req .pk-l{fill:var(--req)} .pk-ok .pk-l{fill:var(--ok)} .pk-warn .pk-l{fill:var(--warn)} .pk-err .pk-l{fill:var(--err)} .pk-evt .pk-l{fill:var(--evt)}
+.o-t{font:500 11px var(--f-mono);fill:var(--muted)}
+.o-tb{font:600 12px var(--f-mono);fill:var(--fg)}
+.o-h{font:600 13px var(--f-body);fill:var(--fg)}
+.o-box{fill:var(--panel-2);stroke:var(--line-2);stroke-width:1}
+.o-line{stroke:var(--line-2);stroke-width:1.2;fill:none;stroke-dasharray:3 4}
+.f-ok{fill:var(--ok)} .f-warn{fill:var(--warn)} .f-err{fill:var(--err)} .f-req{fill:var(--req)} .f-evt{fill:var(--evt)} .f-muted{fill:var(--line-2)} .f-data{fill:var(--data)}
+.s-ok{stroke:var(--ok)} .s-warn{stroke:var(--warn)} .s-err{stroke:var(--err)} .s-req{stroke:var(--req)}
+.chip rect{fill:var(--panel-2);stroke:var(--line-2)}
+.chip text{font:600 11px var(--f-mono);fill:var(--muted);text-anchor:middle}
+.chip.on rect{fill:var(--req);stroke:var(--req)} .chip.on text{fill:var(--bg)}
+.chip.ok rect{fill:var(--ok);stroke:var(--ok)} .chip.ok text{fill:var(--bg)}
+.chip.err rect{fill:var(--err);stroke:var(--err)} .chip.err text{fill:var(--bg)}
+.chip.warn rect{fill:var(--warn);stroke:var(--warn)} .chip.warn text{fill:var(--bg)}
+.cell{stroke:var(--line-2);stroke-width:1}
+.bigstate{font:700 20px var(--f-display)}
+@media (prefers-reduced-motion: reduce){ .edge.on{animation:none} .node rect.box{transition:none} }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">BMTickets · microservices on EKS</div>
+      <h1>Flow Lab: watch every request, event and <em>pattern</em> move</h1>
+    </div>
+    <div class="legend" aria-label="Legend">
+      <span><i style="background:var(--req)"></i>sync call (REST / gRPC)</span>
+      <span><i style="background:var(--evt)"></i>async event (Kafka)</span>
+      <span><i style="background:var(--ok)"></i>success</span>
+      <span><i style="background:var(--warn)"></i>throttled / fallback</span>
+      <span><i style="background:var(--err)"></i>rejected / failure</span>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Patterns"></nav>
+
+  <div class="grid">
+    <section class="stagecard" aria-live="off">
+      <div class="stagehead">
+        <h2 id="scene-title">Architecture</h2>
+        <p id="scene-sub"></p>
+      </div>
+      <div class="stage-scroll">
+        <svg id="stage" viewBox="0 0 1000 600" role="img" aria-label="Animated architecture diagram"></svg>
+      </div>
+      <div class="bar">
+        <div class="transport">
+          <button class="btn primary" id="btn-play" type="button" aria-label="Pause">❚❚ Pause</button>
+          <button class="btn" id="btn-restart" type="button">↺ Restart</button>
+          <div class="seg" id="speed" role="group" aria-label="Speed">
+            <button type="button" data-v="0.5" aria-pressed="false">0.5×</button>
+            <button type="button" data-v="1" aria-pressed="true">1×</button>
+            <button type="button" data-v="2" aria-pressed="false">2×</button>
+          </div>
+        </div>
+        <div class="sep" aria-hidden="true"></div>
+        <div class="ctl" id="controls"></div>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="card">
+        <h3>Now happening</h3>
+        <p id="now-title">—</p>
+        <p id="now-body"></p>
+      </div>
+      <div class="card">
+        <h3>Event log</h3>
+        <ul id="log"></ul>
+      </div>
+      <div class="card">
+        <h3>Production settings</h3>
+        <dl class="cfg" id="cfg"></dl>
+      </div>
+      <div class="card">
+        <h3>Where it lives in the code</h3>
+        <ul class="refs" id="refs"></ul>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('stage');
+const $ = (id) => document.getElementById(id);
+class Abort extends Error {}
+
+/* ===================== engine ===================== */
+const E = { speed: 1, paused: false, token: 0, sim: 0, tickers: new Set(), waiters: [], anims: new Set(),
+            nodes: {}, edges: {}, layers: {}, busy: false };
+
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+let lastTs = null;
+function frame(ts) {
+  const dt = lastTs == null ? 0 : Math.min(60, ts - lastTs);
+  lastTs = ts;
+  if (!E.paused) {
+    const sdt = dt * E.speed;
+    E.sim += sdt;
+    for (const f of [...E.tickers]) { try { f(sdt); } catch (e) { console.error(e); } }
+    if (E.waiters.length) {
+      const due = E.waiters.filter(w => w.at <= E.sim);
+      if (due.length) { E.waiters = E.waiters.filter(w => w.at > E.sim); due.forEach(w => w.resolve()); }
+    }
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+function wait(ms) {
+  const tok = E.token;
+  return new Promise((resolve, reject) => {
+    E.waiters.push({ at: E.sim + ms, resolve: () => tok === E.token ? resolve() : reject(new Abort()), reject });
+  });
+}
+
+function animate(dur, onFrame) {
+  const tok = E.token;
+  return new Promise((resolve, reject) => {
+    let t = 0;
+    const a = { reject };
+    const tick = (sdt) => {
+      if (tok !== E.token) { E.tickers.delete(tick); return; }
+      t += sdt;
+      const p = Math.min(1, t / Math.max(1, dur));
+      onFrame(p);
+      if (p >= 1) { E.tickers.delete(tick); E.anims.delete(a); resolve(); }
+    };
+    E.anims.add(a);
+    E.tickers.add(tick);
+    onFrame(0);
+  });
+}
+
+function resetEngine() {
+  E.token++;
+  E.waiters.forEach(w => w.reject(new Abort())); E.waiters = [];
+  E.anims.forEach(a => a.reject(new Abort())); E.anims.clear();
+  E.tickers.clear();
+  E.nodes = {}; E.edges = {}; E.busy = false;
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  E.layers.edges = el('g', { class: 'l-edges' }, svg);
+  E.layers.under = el('g', { class: 'l-under' }, svg);
+  E.layers.nodes = el('g', { class: 'l-nodes' }, svg);
+  E.layers.over = el('g', { class: 'l-over' }, svg);
+  E.layers.pk = el('g', { class: 'l-pk' }, svg);
+  $('log').innerHTML = '';
+}
+
+function node(d) {
+  const g = el('g', { class: 'node k-' + (d.kind || 'svc'), transform: `translate(${d.x},${d.y})` }, E.layers.nodes);
+  el('rect', { class: 'box', width: d.w, height: d.h, rx: 10 }, g);
+  const t = el('text', { class: 'n-t', x: 12, y: 22 }, g); t.textContent = d.t;
+  const s = el('text', { class: 'n-s', x: 12, y: 39 }, g);
+  if (d.tag) { const k = el('text', { class: 'n-k', x: d.w - 10, y: 16, 'text-anchor': 'end' }, g); k.textContent = d.tag; }
+  const n = { ...d, g, s };
+  E.nodes[d.id] = n;
+  setSub(d.id, d.s || '');
+  return n;
+}
+function setSub(id, text) {
+  const n = E.nodes[id]; if (!n) return;
+  while (n.s.firstChild) n.s.removeChild(n.s.firstChild);
+  String(text).split('\n').forEach((line, i) => {
+    const ts = el('tspan', { x: 12, dy: i === 0 ? 0 : 14 }, n.s); ts.textContent = line;
+  });
+}
+function setState(id, s) { const n = E.nodes[id]; if (n) { if (s) n.g.setAttribute('data-state', s); else n.g.removeAttribute('data-state'); } }
+function flash(id, s, ms = 700) {
+  setState(id, s);
+  const tok = E.token;
+  wait(ms).then(() => { if (tok === E.token && E.nodes[id] && E.nodes[id].g.getAttribute('data-state') === s) setState(id, ''); }).catch(() => {});
+}
+
+const DIRS = { l: [-1, 0], r: [1, 0], t: [0, -1], b: [0, 1] };
+function anchor(n, side, d = 0) {
+  switch (side) {
+    case 'l': return [n.x, n.y + n.h / 2 + d];
+    case 'r': return [n.x + n.w, n.y + n.h / 2 + d];
+    case 't': return [n.x + n.w / 2 + d, n.y];
+    default: return [n.x + n.w / 2 + d, n.y + n.h];
+  }
+}
+function autoSides(a, b) {
+  const dx = (b.x + b.w / 2) - (a.x + a.w / 2), dy = (b.y + b.h / 2) - (a.y + a.h / 2);
+  if (Math.abs(dx) >= Math.abs(dy) * 0.9) return dx > 0 ? ['r', 'l'] : ['l', 'r'];
+  return dy > 0 ? ['b', 't'] : ['t', 'b'];
+}
+function edge(id, from, to, o = {}) {
+  let d = o.d;
+  if (!d) {
+    const a = E.nodes[from], b = E.nodes[to];
+    const [s1, s2] = o.sides || autoSides(a, b);
+    const p1 = anchor(a, s1, o.d1 || 0), p2 = anchor(b, s2, o.d2 || 0);
+    const dist = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+    const k = o.k || Math.max(30, dist * 0.4);
+    const c1 = [p1[0] + DIRS[s1][0] * k, p1[1] + DIRS[s1][1] * k];
+    const c2 = [p2[0] + DIRS[s2][0] * k, p2[1] + DIRS[s2][1] * k];
+    d = `M${p1[0]},${p1[1]} C${c1[0]},${c1[1]} ${c2[0]},${c2[1]} ${p2[0]},${p2[1]}`;
+  }
+  const path = el('path', { class: 'edge', d }, E.layers.edges);
+  if (o.hidden) path.style.opacity = '0';
+  E.edges[id] = { path, len: path.getTotalLength(), active: 0 };
+}
+
+async function send(edgeId, o = {}) {
+  const e = E.edges[edgeId];
+  if (!e) throw new Error('no edge ' + edgeId);
+  const g = el('g', { class: 'pk pk-' + (o.color || 'req') }, E.layers.pk);
+  el('circle', { r: o.r || 6.5 }, g);
+  if (o.label) { const t = el('text', { class: 'pk-l', y: -11 }, g); t.textContent = o.label; }
+  e.active++; e.path.classList.add('on');
+  if (o.color && o.color !== 'req') e.path.style.stroke = `var(--${o.color})`;
+  const rev = !!o.reverse, upto = o.upto ?? 1, dur = (o.dur || 750);
+  const pos = (f) => { const ff = rev ? 1 - f : f; const pt = e.path.getPointAtLength(Math.max(0, Math.min(1, ff)) * e.len); g.setAttribute('transform', `translate(${pt.x},${pt.y})`); };
+  try {
+    await animate(dur * upto, p => pos(p * upto));
+    if (o.bounce) await animate(dur * upto * 0.8, p => pos(upto * (1 - p)));
+    if (o.drop) { await animate(350, p => { g.style.opacity = String(1 - p); }); }
+  } finally {
+    g.remove();
+    e.active--;
+    if (e.active <= 0) { e.path.classList.remove('on'); e.path.style.stroke = ''; }
+  }
+}
+
+function log(msg, tone = '') {
+  const li = document.createElement('li');
+  const t = document.createElement('time'); t.textContent = '+' + (E.sim / 1000).toFixed(1) + 's';
+  const m = document.createElement('span'); m.textContent = msg; if (tone) m.className = 't-' + tone;
+  li.append(t, m);
+  const ul = $('log'); ul.prepend(li);
+  while (ul.children.length > 80) ul.lastChild.remove();
+}
+function say(title, body) { $('now-title').textContent = title; $('now-body').textContent = body || ''; }
+
+/* overlay helpers */
+const O = {
+  g(parent) { return el('g', {}, parent || E.layers.over); },
+  text(x, y, s, cls = 'o-t', anchorPos = 'start', parent) { const t = el('text', { x, y, class: cls, 'text-anchor': anchorPos }, parent || E.layers.over); t.textContent = s; return t; },
+  rect(x, y, w, h, cls = 'o-box', rx = 6, parent) { return el('rect', { x, y, width: w, height: h, rx, class: cls }, parent || E.layers.over); },
+  circle(cx, cy, r, cls, parent) { return el('circle', { cx, cy, r, class: cls }, parent || E.layers.over); },
+  line(x1, y1, x2, y2, cls = 'o-line', parent) { return el('line', { x1, y1, x2, y2, class: cls }, parent || E.layers.under); },
+  path(d, cls = 'o-line', parent) { return el('path', { d, class: cls }, parent || E.layers.under); },
+  chip(x, y, w, label, parent) {
+    const g = el('g', { class: 'chip', transform: `translate(${x},${y})` }, parent || E.layers.over);
+    el('rect', { width: w, height: 24, rx: 12 }, g);
+    const t = el('text', { x: w / 2, y: 16 }, g); t.textContent = label;
+    return g;
+  },
+};
+
+function spawn(fn) { const p = Promise.resolve().then(fn); p.catch(e => { if (!(e instanceof Abort)) console.error(e); }); return p; }
+async function exclusive(fn) {
+  if (E.busy) { log('A run is in progress — wait for it to finish', 'warn'); return; }
+  E.busy = true; document.querySelectorAll('.excl').forEach(b => b.disabled = true);
+  const tok = E.token;
+  try { await fn(); }
+  catch (e) { if (!(e instanceof Abort)) console.error(e); }
+  finally { if (tok === E.token) { E.busy = false; document.querySelectorAll('.excl').forEach(b => b.disabled = false); } }
+}
+const rnd = (a, b) => a + Math.random() * (b - a);
+const api = { node, edge, send, wait, log, say, setSub, setState, flash, spawn, exclusive, O, E };
+
+/* ===================== scenes ===================== */
+const scenes = [];
+
+/* ---------- 1. Architecture ---------- */
+scenes.push({
+  id: 'architecture', tab: 'Architecture',
+  title: 'End-to-end architecture',
+  sub: 'One booking from sign-in to ticket e-mail: edge, gateway, gRPC + Feign calls, Redis, Aurora, Stripe, Kafka and SES.',
+  cfg: [['Edge', 'CloudFront → WAF → ALB (TLS 1.3)'], ['Compute', 'EKS 1.33, 3 AZs, Graviton'], ['Sync', 'REST, gRPC (booking→catalog/inventory), Feign (booking→payment)'], ['Async', 'MSK Kafka, RF 3, outbox relay'], ['Data', 'Aurora PG per service, ElastiCache Redis']],
+  refs: [['README.md', 'repository map and run instructions'], ['docs/ARCHITECTURE.md', '§2 high-level architecture, §6 booking flow'], ['k8s/base/services/*.yaml', 'Deployment, Service, HPA, PDB per service']],
+  build(a) {
+    const N = [
+      { id: 'client', x: 16, y: 262, w: 112, h: 64, t: 'Client', s: 'web · mobile', kind: 'client' },
+      { id: 'cognito', x: 150, y: 118, w: 120, h: 56, t: 'Cognito', s: 'OIDC · JWT', kind: 'ext' },
+      { id: 'edge', x: 150, y: 262, w: 120, h: 64, t: 'WAF · ALB', s: 'TLS · IP rules', kind: 'edge' },
+      { id: 'gw', x: 298, y: 244, w: 144, h: 100, t: 'api-gateway', s: 'JWT check\ntoken bucket\nCB · shedding', kind: 'gw' },
+      { id: 'catalog', x: 520, y: 40, w: 150, h: 60, t: 'catalog', s: 'REST · gRPC', tag: 'svc' },
+      { id: 'inventory', x: 520, y: 140, w: 150, h: 60, t: 'seat-inventory', s: 'gRPC holds', tag: 'svc' },
+      { id: 'booking', x: 520, y: 262, w: 150, h: 64, t: 'booking', s: 'saga orchestrator', tag: 'svc' },
+      { id: 'payment', x: 520, y: 380, w: 150, h: 60, t: 'payment', s: 'Stripe ACL', tag: 'svc' },
+      { id: 'notify', x: 520, y: 490, w: 150, h: 60, t: 'notification', s: 'Kafka → SES', tag: 'svc' },
+      { id: 'redis', x: 760, y: 40, w: 124, h: 56, t: 'Redis', s: 'ElastiCache', kind: 'data' },
+      { id: 'db', x: 760, y: 150, w: 124, h: 56, t: 'Aurora PG', s: 'DB per service', kind: 'data' },
+      { id: 'kafka', x: 760, y: 262, w: 124, h: 120, t: 'Kafka', s: 'MSK\npayment.events\nbooking.events', kind: 'bus' },
+      { id: 'stripe', x: 904, y: 400, w: 90, h: 56, t: 'Stripe', s: 'PSP', kind: 'ext' },
+      { id: 'ses', x: 904, y: 500, w: 90, h: 56, t: 'SES', s: 'e-mail', kind: 'ext' },
+    ];
+    N.forEach(n => a.node(n));
+    a.edge('c-cog', 'client', 'cognito', { sides: ['t', 'l'] });
+    a.edge('c-edge', 'client', 'edge');
+    a.edge('edge-gw', 'edge', 'gw');
+    a.edge('gw-cat', 'gw', 'catalog', { sides: ['r', 'l'], d1: -36 });
+    a.edge('gw-inv', 'gw', 'inventory', { sides: ['r', 'l'], d1: -14 });
+    a.edge('gw-bk', 'gw', 'booking', { sides: ['r', 'l'], d1: 0 });
+    a.edge('gw-pay', 'gw', 'payment', { sides: ['r', 'l'], d1: 22 });
+    a.edge('gw-redis', null, null, { d: 'M370,244 C370,-20 690,-20 760,62' });
+    a.edge('cat-redis', 'catalog', 'redis', { sides: ['r', 'l'], d2: -6 });
+    a.edge('cat-db', 'catalog', 'db', { sides: ['r', 'l'], d1: 12, d2: -10 });
+    a.edge('inv-redis', 'inventory', 'redis', { sides: ['r', 'l'], d2: 12 });
+    a.edge('inv-db', 'inventory', 'db', { sides: ['r', 'l'], d2: 2 });
+    a.edge('bk-cat', null, null, { d: 'M520,272 C468,272 468,62 520,62' });
+    a.edge('bk-inv', null, null, { d: 'M520,282 C488,282 488,178 520,178' });
+    a.edge('bk-redis', 'booking', 'redis', { sides: ['r', 'l'], d1: -22, d2: 20 });
+    a.edge('bk-db', 'booking', 'db', { sides: ['r', 'l'], d1: -10, d2: 14 });
+    a.edge('bk-pay', 'booking', 'payment', { sides: ['b', 't'] });
+    a.edge('pay-db', 'payment', 'db', { sides: ['r', 'l'], d1: -14, d2: 24 });
+    a.edge('pay-stripe', 'payment', 'stripe', { sides: ['r', 'l'], d1: 6, d2: -6 });
+    a.edge('stripe-pay', 'stripe', 'payment', { sides: ['l', 'r'], d1: 8, d2: 20 });
+    a.edge('pay-kafka', 'payment', 'kafka', { sides: ['r', 'l'], d1: -4, d2: 40 });
+    a.edge('kafka-bk', 'kafka', 'booking', { sides: ['l', 'r'], d1: -30, d2: 4 });
+    a.edge('bk-kafka', 'booking', 'kafka', { sides: ['r', 'l'], d1: 16, d2: 0 });
+    a.edge('kafka-notify', 'kafka', 'notify', { sides: ['b', 'r'] });
+    a.edge('notify-ses', 'notify', 'ses', { sides: ['r', 'l'] });
+    a.edge('c-stripe', null, null, { d: 'M72,326 C72,640 949,640 949,456' });
+    a.edge('ses-c', null, null, { d: 'M949,556 C949,612 60,612 40,326' });
+  },
+  async run(a) {
+    const hop = (e, o) => a.send(e, { dur: 650, ...o });
+    while (true) {
+      a.say('1 · Sign in', 'The SPA signs in with Cognito (OIDC + PKCE) and receives a JWT access token.');
+      a.log('Client → Cognito: authorization code + PKCE', 'req');
+      await hop('c-cog', { label: 'login' });
+      await hop('c-cog', { reverse: true, color: 'ok', label: 'JWT' });
+
+      a.say('2 · Browse the catalog', 'GET requests pass WAF and the ALB. The gateway checks the JWT and the token bucket, and catalog serves from Redis (cache-aside).');
+      await hop('c-edge', { label: 'GET /catalog' });
+      a.flash('edge', 'ok', 500);
+      await hop('edge-gw');
+      a.setState('gw', 'busy');
+      await hop('gw-redis', { label: 'bucket -1', dur: 550 });
+      await hop('gw-redis', { reverse: true, color: 'ok', dur: 550 });
+      a.setState('gw', '');
+      await hop('gw-cat');
+      await hop('cat-redis', { label: 'GET' });
+      a.log('catalog: Redis cache HIT (1 ms)', 'ok');
+      await hop('cat-redis', { reverse: true, color: 'ok', label: 'HIT' });
+      await hop('gw-cat', { reverse: true, color: 'ok' });
+      await hop('edge-gw', { reverse: true, color: 'ok' });
+      await hop('c-edge', { reverse: true, color: 'ok', label: '200' });
+
+      a.say('3 · Create the booking', 'POST /bookings with an Idempotency-Key. The booking service runs the saga: gRPC to catalog and inventory, then Feign to payment, which creates a Stripe PaymentIntent.');
+      await hop('c-edge', { label: 'POST /bookings' });
+      await hop('edge-gw');
+      await hop('gw-bk', { label: 'JWT ✓ 2/s ✓' });
+      a.setState('booking', 'busy');
+      await hop('bk-redis', { label: 'SET NX idem' });
+      await hop('bk-redis', { reverse: true, color: 'ok' });
+      a.log('booking: Idempotency-Key acquired', 'ok');
+      await hop('bk-cat', { label: 'gRPC GetShow' });
+      await hop('bk-cat', { reverse: true, color: 'ok', label: 'prices' });
+      await hop('bk-inv', { label: 'gRPC HoldSeats' });
+      a.setState('inventory', 'busy');
+      await hop('inv-redis', { label: 'Lua hold' });
+      await hop('inv-redis', { reverse: true, color: 'ok' });
+      await hop('inv-db', { label: 'FOR UPDATE' });
+      await hop('inv-db', { reverse: true, color: 'ok', label: 'HELD' });
+      a.setState('inventory', '');
+      a.log('inventory: A-1, A-2 HELD for 10 min', 'ok');
+      await hop('bk-inv', { reverse: true, color: 'ok' });
+      await hop('bk-pay', { label: 'Feign create' });
+      await hop('pay-stripe', { label: 'PaymentIntent' });
+      await hop('pay-stripe', { reverse: true, color: 'ok', label: 'client_secret' });
+      await hop('bk-pay', { reverse: true, color: 'ok' });
+      await hop('bk-db', { label: 'PENDING_PAYMENT' });
+      a.setState('booking', '');
+      await hop('gw-bk', { reverse: true, color: 'ok' });
+      await hop('edge-gw', { reverse: true, color: 'ok' });
+      await hop('c-edge', { reverse: true, color: 'ok', label: '201' });
+
+      a.say('4 · Pay and confirm (async)', 'The browser pays Stripe directly (3-DS). The signed webhook reaches payment, which commits the change and an outbox row together. Kafka then drives the rest of the saga.');
+      await a.send('c-stripe', { dur: 1300, label: 'confirm card' });
+      a.flash('stripe', 'ok', 600);
+      await hop('stripe-pay', { color: 'ok', label: 'webhook' });
+      await hop('pay-db', { label: 'tx + outbox' });
+      await hop('pay-db', { reverse: true, color: 'ok' });
+      a.log('payment.events ← PaymentSucceeded', 'evt');
+      await hop('pay-kafka', { color: 'evt', label: 'PaymentSucceeded' });
+      await hop('kafka-bk', { color: 'evt' });
+      a.setState('booking', 'busy');
+      await hop('bk-inv', { label: 'ConfirmSeats' });
+      await hop('bk-inv', { reverse: true, color: 'ok', label: 'BOOKED' });
+      a.setState('booking', 'ok');
+      a.log('booking: CONFIRMED + ticket code', 'ok');
+      await hop('bk-kafka', { color: 'evt', label: 'BookingConfirmed' });
+      a.setState('booking', '');
+      await hop('kafka-notify', { color: 'evt' });
+      await hop('notify-ses', { label: 'SendEmail' });
+      await a.send('ses-c', { dur: 1300, color: 'ok', label: 'ticket e-mail' });
+      a.flash('client', 'ok', 900);
+      a.log('Ticket delivered to the customer', 'ok');
+      a.say('Done', 'Restarting the flow in a moment…');
+      await a.wait(1800);
+    }
+  },
+});
+
+/* ---------- 2. Saga ---------- */
+scenes.push({
+  id: 'saga', tab: 'Booking saga',
+  title: 'Orchestrated saga with compensations',
+  sub: 'booking-service drives each step as a local transaction plus an idempotent remote command. When a step fails, compensations undo the earlier steps.',
+  cfg: [['Payment window', '8 min (PAYMENT_WINDOW)'], ['Seat hold TTL', '10 min (> payment window)'], ['Expiry job', 'every 15 s, ShedLock'], ['Idempotency', 'holdRef = bookingId, Stripe keys per booking']],
+  refs: [['booking-service/…/saga/BookingSagaOrchestrator.java', 'synchronous steps 1–5 + compensation'], ['booking-service/…/saga/BookingCompletionService.java', 'payment events, expiry, refund, reconciliation'], ['booking-service/…/domain/BookingStatus.java', 'state machine'], ['booking-service/…/saga/BookingExpiryJob.java', 'saga timeout']],
+  controls: [
+    { type: 'button', label: '▶ Happy path', excl: true, act: (a, s) => a.exclusive(() => s.flow(a, 'ok')) },
+    { type: 'button', label: 'Payment fails', excl: true, act: (a, s) => a.exclusive(() => s.flow(a, 'fail')) },
+    { type: 'button', label: 'Window expires', excl: true, act: (a, s) => a.exclusive(() => s.flow(a, 'expire')) },
+    { type: 'button', label: 'Paid after expiry → refund', excl: true, act: (a, s) => a.exclusive(() => s.flow(a, 'late')) },
+    { type: 'button', label: 'Seats taken', excl: true, act: (a, s) => a.exclusive(() => s.flow(a, 'taken')) },
+  ],
+  build(a) {
+    [
+      { id: 'client', x: 20, y: 248, w: 120, h: 66, t: 'Client', s: 'Stripe.js', kind: 'client' },
+      { id: 'catalog', x: 200, y: 96, w: 170, h: 58, t: 'catalog', s: 'gRPC GetShow' },
+      { id: 'inventory', x: 500, y: 96, w: 190, h: 58, t: 'seat-inventory', s: 'gRPC Hold/Confirm/Release' },
+      { id: 'booking', x: 320, y: 232, w: 210, h: 100, t: 'booking-service', s: 'SAGA ORCHESTRATOR\nbooking_db · local tx\nstatus: —', kind: 'gw' },
+      { id: 'payment', x: 660, y: 250, w: 150, h: 66, t: 'payment', s: 'Feign /internal' },
+      { id: 'stripe', x: 870, y: 250, w: 120, h: 66, t: 'Stripe', s: 'PaymentIntent', kind: 'ext' },
+      { id: 'kafka', x: 320, y: 420, w: 210, h: 62, t: 'Kafka', s: 'payment.events\nbooking.events', kind: 'bus' },
+      { id: 'notify', x: 700, y: 420, w: 150, h: 56, t: 'notification', s: 'ticket e-mail' },
+    ].forEach(n => a.node(n));
+    a.edge('c-bk', 'client', 'booking', { sides: ['r', 'l'], d1: 0, d2: 0 });
+    a.edge('bk-cat', 'booking', 'catalog', { sides: ['t', 'b'], d1: -55 });
+    a.edge('bk-inv', 'booking', 'inventory', { sides: ['t', 'b'], d1: 55 });
+    a.edge('bk-pay', 'booking', 'payment', { sides: ['r', 'l'] });
+    a.edge('pay-stripe', 'payment', 'stripe', { sides: ['r', 'l'], d1: -10, d2: -10 });
+    a.edge('stripe-pay', 'stripe', 'payment', { sides: ['l', 'r'], d1: 12, d2: 12 });
+    a.edge('c-stripe', null, null, { d: 'M80,314 C80,620 930,620 930,316' });
+    a.edge('bk-kafka', 'booking', 'kafka', { sides: ['b', 't'], d1: 35, d2: 35 });
+    a.edge('kafka-bk', 'kafka', 'booking', { sides: ['t', 'b'], d1: -35, d2: -35 });
+    a.edge('pay-kafka', 'payment', 'kafka', { sides: ['b', 'r'], d2: -12 });
+    a.edge('kafka-notify', 'kafka', 'notify', { sides: ['r', 'l'], d1: 14 });
+    // status strip
+    const states = ['PENDING_SEATS', 'PENDING_PAYMENT', 'CONFIRMED', 'FAILED', 'EXPIRED'];
+    a.O.text(20, 34, 'booking.status', 'o-t');
+    this.chips = {};
+    let x = 130;
+    states.forEach((s, i) => {
+      const w = s.length * 7.6 + 24;
+      this.chips[s] = a.O.chip(x, 18, w, s);
+      x += w + (i === 1 ? 26 : 14);
+      if (i === 0) a.O.text(x - 9, 34, '→', 'o-t', 'middle');
+      if (i === 1) a.O.text(x - 15, 34, '→', 'o-t', 'middle');
+    });
+    a.O.text(130, 64, 'compensations: release seats · cancel PaymentIntent · refund', 'o-t');
+  },
+  setStatus(a, s) {
+    Object.entries(this.chips).forEach(([k, g]) => g.setAttribute('class', 'chip'));
+    if (s) {
+      const cls = s === 'CONFIRMED' ? 'ok' : (s === 'FAILED' || s === 'EXPIRED') ? 'err' : 'on';
+      this.chips[s].setAttribute('class', 'chip ' + cls);
+    }
+    a.setSub('booking', 'SAGA ORCHESTRATOR\nbooking_db · local tx\nstatus: ' + (s || '—'));
+  },
+  async flow(a, mode) {
+    const h = (e, o) => a.send(e, { dur: 700, ...o });
+    this.setStatus(a, null); ['booking', 'inventory', 'payment', 'stripe', 'client', 'notify'].forEach(n => a.setState(n, ''));
+    a.say('Step 1–2 · Validate and create the booking', 'Booking calls catalog over gRPC, then inserts the booking as PENDING_SEATS in its own transaction. Unique constraints block duplicates.');
+    await h('c-bk', { label: 'POST /bookings' });
+    a.setState('booking', 'busy');
+    await h('bk-cat', { label: 'GetShow' });
+    await h('bk-cat', { reverse: true, color: 'ok', label: 'OPEN · prices' });
+    this.setStatus(a, 'PENDING_SEATS'); a.log('INSERT booking PENDING_SEATS (local tx)', 'req');
+    await a.wait(300);
+    a.say('Step 3 · Hold seats', 'HoldSeats(holdRef = bookingId) is all-or-nothing and idempotent, so it is safe to retry after a timeout.');
+    await h('bk-inv', { label: 'HoldSeats A-1,A-2' });
+    if (mode === 'taken') {
+      a.flash('inventory', 'err', 900);
+      await h('bk-inv', { reverse: true, color: 'err', label: 'SEATS_UNAVAILABLE A-2' });
+      this.setStatus(a, 'FAILED'); a.setState('booking', 'err');
+      a.log('Hold failed → booking FAILED, nothing to compensate', 'err');
+      a.say('Seats taken', 'The hold failed before any money moved, so the saga stops: booking FAILED and the client gets 409 with the unavailable seats.');
+      await h('c-bk', { reverse: true, color: 'err', label: '409' });
+      a.setState('booking', '');
+      return;
+    }
+    await h('bk-inv', { reverse: true, color: 'ok', label: 'HELD' });
+    a.say('Step 4 · Create the PaymentIntent', 'Feign calls payment-service, which calls Stripe with Idempotency-Key "pi-create-<bookingId>".');
+    await h('bk-pay', { label: 'create' });
+    await h('pay-stripe', { label: 'PaymentIntent' });
+    await h('pay-stripe', { reverse: true, color: 'ok', label: 'client_secret' });
+    await h('bk-pay', { reverse: true, color: 'ok' });
+    this.setStatus(a, 'PENDING_PAYMENT'); a.log('booking PENDING_PAYMENT, expires in 8 min', 'req');
+    await h('c-bk', { reverse: true, color: 'ok', label: '201 + client_secret' });
+    a.setState('booking', '');
+
+    if (mode === 'expire' || mode === 'late') {
+      a.say('Saga timeout', 'The user never pays. BookingExpiryJob (one replica, ShedLock) cancels the intent first, then compensates by releasing the seats.');
+      a.log('… 8 minutes pass, no payment', 'warn');
+      await a.wait(1400);
+      a.setState('booking', 'warn');
+      await h('bk-pay', { color: 'warn', label: 'cancel intent' });
+      await h('pay-stripe', { color: 'warn', label: 'cancel' });
+      await h('pay-stripe', { reverse: true, color: 'ok', label: 'canceled' });
+      await h('bk-pay', { reverse: true, color: 'ok' });
+      await h('bk-inv', { color: 'err', label: 'compensate: Release' });
+      await h('bk-inv', { reverse: true, color: 'ok', label: 'AVAILABLE' });
+      this.setStatus(a, 'EXPIRED'); a.log('booking EXPIRED, seats back in the pool', 'err');
+      await h('bk-kafka', { color: 'evt', label: 'BookingCancelled' });
+      await h('kafka-notify', { color: 'evt' });
+      a.setState('booking', '');
+      if (mode === 'expire') return;
+      a.say('Late payment → refund', 'A payment captured after expiry cannot be honoured. Booking emits a RefundRequested command, and payment refunds idempotently with the key "refund-<bookingId>".');
+      await a.send('c-stripe', { dur: 1300, label: 'pays late' });
+      await h('stripe-pay', { color: 'ok', label: 'succeeded' });
+      await h('pay-kafka', { color: 'evt', label: 'PaymentSucceeded' });
+      await h('kafka-bk', { color: 'evt' });
+      a.setState('booking', 'warn'); a.log('booking is EXPIRED → compensate with refund', 'warn');
+      await h('kafka-bk', { reverse: true, color: 'evt', label: 'RefundRequested' });
+      await h('pay-kafka', { reverse: true, color: 'evt' });
+      await h('pay-stripe', { color: 'warn', label: 'refund' });
+      await h('pay-stripe', { reverse: true, color: 'ok', label: 'refunded' });
+      a.log('Refund issued, customer made whole', 'ok');
+      a.setState('booking', '');
+      return;
+    }
+
+    a.say('Customer pays', 'The card is confirmed in the browser with Stripe.js (3-DS). Booking is not involved in this step.');
+    await a.send('c-stripe', { dur: 1400, label: mode === 'fail' ? 'card declined' : 'confirm card', color: mode === 'fail' ? 'err' : 'req' });
+    if (mode === 'fail') {
+      await h('stripe-pay', { color: 'err', label: 'intent canceled' });
+      a.say('Step 5′ · Compensate', 'Payment publishes PaymentFailed through its outbox. Booking releases the seats and marks the booking FAILED.');
+      await h('pay-kafka', { color: 'evt', label: 'PaymentFailed' });
+      await h('kafka-bk', { color: 'evt' });
+      a.setState('booking', 'err');
+      await h('bk-inv', { color: 'err', label: 'compensate: Release' });
+      await h('bk-inv', { reverse: true, color: 'ok', label: 'AVAILABLE' });
+      this.setStatus(a, 'FAILED'); a.log('booking FAILED, seats released', 'err');
+      await h('bk-kafka', { color: 'evt', label: 'BookingCancelled' });
+      await h('kafka-notify', { color: 'evt' });
+      a.setState('booking', '');
+      return;
+    }
+    await h('stripe-pay', { color: 'ok', label: 'webhook succeeded' });
+    a.say('Step 5 · Confirm (async)', 'PaymentSucceeded arrives over Kafka. Booking confirms the seats (HELD → BOOKED), then sets CONFIRMED and writes the outbox event in one transaction.');
+    await h('pay-kafka', { color: 'evt', label: 'PaymentSucceeded' });
+    await h('kafka-bk', { color: 'evt' });
+    a.setState('booking', 'busy');
+    await h('bk-inv', { label: 'ConfirmSeats' });
+    await h('bk-inv', { reverse: true, color: 'ok', label: 'BOOKED' });
+    this.setStatus(a, 'CONFIRMED'); a.setState('booking', 'ok'); a.log('booking CONFIRMED + signed ticket code', 'ok');
+    await h('bk-kafka', { color: 'evt', label: 'BookingConfirmed' });
+    await h('kafka-notify', { color: 'evt' });
+    a.flash('notify', 'ok', 900);
+    a.setState('booking', '');
+  },
+  async run(a) {
+    a.say('Pick a scenario', 'Running the happy path first. Use the buttons to replay or to try a failure.');
+    await a.wait(600);
+    await this.flow(a, 'ok');
+    a.say('Try a failure', 'Payment fails, Window expires, Paid after expiry and Seats taken each show a different compensation.');
+  },
+});
+
+/* ---------- 3. Circuit breaker ---------- */
+scenes.push({
+  id: 'circuit-breaker', tab: 'Circuit breaker',
+  title: 'Circuit breaker',
+  sub: 'Resilience4j counts recent call outcomes. When too many fail or run slow, it opens and fails fast. After a wait it lets a few trial calls through.',
+  cfg: [['Sliding window', '50 calls (demo: 10)'], ['Minimum calls', '20 (demo: 5)'], ['Failure threshold', '50 %'], ['Slow call', '> 2 s, 80 % slow → open'], ['Open state', '10 s (demo: 4 s)'], ['Half-open trials', '5 (demo: 3)']],
+  refs: [['booking-service/…/client/PaymentServiceAdapter.java', '@CircuitBreaker(name = "payment") + @Retry'], ['booking-service/src/main/resources/application.yml', 'resilience4j.circuitbreaker.*'], ['api-gateway/…/config/ResilienceConfig.java', 'per-route breakers at the edge'], ['api-gateway/…/web/FallbackController.java', '503 problem+json fallback']],
+  opts: { health: 'healthy', auto: true },
+  controls: [
+    { type: 'seg', label: 'payment-service', key: 'health', options: [['healthy', 'Healthy'], ['failing', 'Failing'], ['slow', 'Slow']] },
+    { type: 'toggle', label: 'Auto demo', key: 'auto' },
+  ],
+  build(a) {
+    a.node({ id: 'booking', x: 30, y: 250, w: 160, h: 72, t: 'booking-service', s: 'PaymentServiceAdapter' });
+    a.node({ id: 'cb', x: 380, y: 236, w: 230, h: 100, t: 'CircuitBreaker "payment"', s: '', kind: 'gw' });
+    a.node({ id: 'pay', x: 800, y: 250, w: 170, h: 72, t: 'payment-service', s: 'healthy' });
+    a.edge('bk-cb', 'booking', 'cb', { sides: ['r', 'l'] });
+    a.edge('cb-pay', 'cb', 'pay', { sides: ['r', 'l'] });
+    this.bigState = a.O.text(392, 318, 'CLOSED', 'bigstate f-ok');
+    // state machine
+    a.O.text(250, 72, 'state machine', 'o-t');
+    this.sm = { CLOSED: a.O.chip(250, 86, 100, 'CLOSED'), OPEN: a.O.chip(470, 86, 90, 'OPEN'), HALF: a.O.chip(680, 86, 120, 'HALF_OPEN') };
+    a.O.text(410, 102, 'fail ≥ 50 % →', 'o-t', 'middle');
+    a.O.text(620, 102, 'wait 4 s →', 'o-t', 'middle');
+    a.O.path('M740,112 C740,168 300,168 300,112', 'o-line');
+    a.O.text(520, 160, '← 3 trial calls succeed (any failure re-opens)', 'o-t', 'middle');
+    // window
+    a.O.text(380, 392, 'sliding window: last 10 calls', 'o-t');
+    this.cells = [];
+    for (let i = 0; i < 10; i++) this.cells.push(el('rect', { x: 380 + i * 23, y: 400, width: 19, height: 19, rx: 4, class: 'cell f-muted' }, E.layers.over));
+    this.rateTxt = a.O.text(380, 442, 'failure rate —', 'o-tb');
+    this.timerTxt = a.O.text(380, 462, '', 'o-t');
+    this.counts = a.O.text(30, 360, '', 'o-t');
+    a.O.text(30, 378, 'open circuit → no remote call, instant fallback', 'o-t');
+    this.st = 'CLOSED'; this.win = []; this.openedAt = 0; this.trial = 0; this.halfOk = 0; this.n = { ok: 0, fail: 0, rej: 0 };
+    this.render(a);
+    E.tickers.add(() => {
+      if (this.st === 'OPEN') {
+        const left = 4000 - (E.sim - this.openedAt);
+        this.timerTxt.textContent = 'OPEN — next trial in ' + Math.max(0, left / 1000).toFixed(1) + ' s';
+        if (left <= 0) { this.st = 'HALF'; this.trial = 0; this.halfOk = 0; a.log('wait elapsed → HALF_OPEN, 3 trial calls allowed', 'warn'); this.render(a); }
+      }
+    });
+  },
+  render(a) {
+    const label = this.st === 'HALF' ? 'HALF_OPEN' : this.st;
+    this.bigState.textContent = label;
+    this.bigState.setAttribute('class', 'bigstate ' + (this.st === 'CLOSED' ? 'f-ok' : this.st === 'OPEN' ? 'f-err' : 'f-warn'));
+    Object.entries(this.sm).forEach(([k, g]) => g.setAttribute('class', 'chip' + (k === this.st ? (k === 'CLOSED' ? ' ok' : k === 'OPEN' ? ' err' : ' warn') : '')));
+    a.setState('cb', this.st === 'CLOSED' ? '' : this.st === 'OPEN' ? 'err' : 'warn');
+    this.cells.forEach((c, i) => { const v = this.win[i]; c.setAttribute('class', 'cell ' + (v === undefined ? 'f-muted' : v ? 'f-ok' : 'f-err')); });
+    const fails = this.win.filter(v => !v).length;
+    this.rateTxt.textContent = this.win.length ? `failure rate ${Math.round(100 * fails / this.win.length)} % (${fails}/${this.win.length})` + (this.win.length < 5 ? ' · below minimum calls' : '') : 'failure rate —';
+    if (this.st !== 'OPEN') this.timerTxt.textContent = this.st === 'HALF' ? `HALF_OPEN — trial calls ok: ${this.halfOk}/3` : '';
+    a.setSub('cb', `permitted: ${this.st === 'OPEN' ? 'none' : this.st === 'HALF' ? '3 trials' : 'all'}`);
+    this.counts.textContent = `ok ${this.n.ok} · failed ${this.n.fail} · short-circuited ${this.n.rej}`;
+  },
+  record(a, ok) {
+    if (this.st === 'HALF') {
+      if (!ok) { this.open(a, 'trial call failed'); return; }
+      this.halfOk++;
+      if (this.halfOk >= 3) { this.st = 'CLOSED'; this.win = []; a.log('3 trials succeeded → CLOSED', 'ok'); }
+    } else if (this.st === 'CLOSED') {
+      this.win.push(ok); if (this.win.length > 10) this.win.shift();
+      const fails = this.win.filter(v => !v).length;
+      if (this.win.length >= 5 && fails / this.win.length >= 0.5) this.open(a, `failure rate ${Math.round(100 * fails / this.win.length)} %`);
+    }
+    this.render(a);
+  },
+  open(a, why) { this.st = 'OPEN'; this.openedAt = E.sim; a.log(`${why} → OPEN (fail fast)`, 'err'); this.render(a); },
+  async request(a) {
+    await a.send('bk-cb', { dur: 550 });
+    if (this.st === 'OPEN' || (this.st === 'HALF' && this.trial >= 3)) {
+      this.n.rej++; this.render(a);
+      await a.send('bk-cb', { reverse: true, color: 'warn', dur: 450, label: '503 fallback' });
+      return;
+    }
+    if (this.st === 'HALF') this.trial++;
+    const h = this.opts.health;
+    await a.send('cb-pay', { dur: 550 });
+    if (h === 'slow') { a.flash('pay', 'warn', 1600); await a.wait(1700); }
+    if (h === 'failing') a.flash('pay', 'err', 400);
+    const ok = h === 'healthy';
+    await a.send('cb-pay', { reverse: true, dur: 550, color: ok ? 'ok' : 'err', label: ok ? '200' : h === 'slow' ? 'slow 2.3 s' : '500' });
+    if (ok) this.n.ok++; else this.n.fail++;
+    this.record(a, ok);
+    await a.send('bk-cb', { reverse: true, dur: 550, color: ok ? 'ok' : 'err' });
+  },
+  setHealth(a, h) { this.opts.health = h; a.setSub('pay', h); a.setState('pay', h === 'healthy' ? '' : h === 'failing' ? 'err' : 'warn'); syncControls(this); },
+  async run(a) {
+    a.say('Calls flow through the breaker', 'Each call\'s outcome lands in the sliding window. Switch payment-service to Failing or Slow, or let the auto demo do it.');
+    this.setHealth(a, this.opts.health);
+    a.spawn(async () => { while (true) { a.spawn(() => this.request(a)); await a.wait(650); } });
+    let phase = 0;
+    while (true) {
+      await a.wait(7000);
+      if (!this.opts.auto) continue;
+      phase = (phase + 1) % 3;
+      const h = ['healthy', 'failing', 'slow'][phase];
+      this.setHealth(a, h);
+      a.log(`auto demo: payment-service is now ${h}`, h === 'healthy' ? 'ok' : 'warn');
+      a.say(h === 'healthy' ? 'Dependency recovered' : h === 'failing' ? 'Dependency failing' : 'Dependency slow',
+        h === 'healthy' ? 'Trial calls in HALF_OPEN succeed and the breaker closes again.' : h === 'failing' ? 'Errors fill the window. At 50 % the breaker opens, and callers get an instant 503 fallback instead of waiting.' : 'Calls slower than the threshold count as failures, so a slow dependency also trips the breaker.');
+    }
+  },
+});
+
+/* ---------- 4. Rate limiter ---------- */
+scenes.push({
+  id: 'rate-limiter', tab: 'Rate limiter',
+  title: 'Token-bucket rate limiter (per user, in Redis)',
+  sub: 'Each user has a bucket in Redis that every gateway pod shares. A request costs one token, and tokens refill at a steady rate. An empty bucket returns 429 with Retry-After.',
+  opts: { rate: 2, burst: 5, auto: true, hammer: false },
+  cfg: [['Bookings', '2 req/s per user, burst 5'], ['Authenticated APIs', '20 req/s per user, burst 40'], ['Catalog (anon)', '50 req/s per IP, burst 100'], ['Webhooks', '100 req/s per IP'], ['WAF', '100 bookings/min per IP'], ['Redis down', 'fail open (WAF + service limits remain)']],
+  refs: [['api-gateway/…/config/RateLimiterConfig.java', 'KeyResolvers + RedisRateLimiter beans'], ['api-gateway/…/config/RoutesConfig.java', 'bucket and key per route'], ['common-lib/…/ratelimit/DistributedRateLimiter.java', 'service-level token bucket'], ['common-lib/src/main/resources/scripts/token_bucket.lua', 'atomic bucket math'], ['k8s/aws/waf-web-acl.json', 'edge per-IP rules']],
+  controls: [
+    { type: 'button', label: 'Alice books', act: (a, s) => a.spawn(() => s.request(a, 'alice')) },
+    { type: 'button', label: 'Bot burst ×12', act: (a, s) => a.spawn(() => s.burst(a, 12)) },
+    { type: 'toggle', label: 'Bot keeps hammering', key: 'hammer' },
+    { type: 'range', label: 'refill /s', key: 'rate', min: 1, max: 8, step: 1 },
+    { type: 'range', label: 'burst', key: 'burst', min: 1, max: 10, step: 1 },
+    { type: 'toggle', label: 'Auto traffic', key: 'auto' },
+  ],
+  build(a) {
+    a.node({ id: 'alice', x: 30, y: 96, w: 150, h: 64, t: 'alice', s: 'human · user:alice', kind: 'client' });
+    a.node({ id: 'bot', x: 30, y: 400, w: 150, h: 64, t: 'bot-7731', s: 'script · user:bot', kind: 'client' });
+    a.node({ id: 'gw', x: 320, y: 232, w: 190, h: 108, t: 'api-gateway', s: 'RequestRateLimiter\nkey = JWT sub', kind: 'gw' });
+    a.node({ id: 'booking', x: 830, y: 254, w: 150, h: 64, t: 'booking', s: 'POST /bookings' });
+    a.edge('alice-gw', 'alice', 'gw', { sides: ['r', 'l'], d2: -20 });
+    a.edge('bot-gw', 'bot', 'gw', { sides: ['r', 'l'], d2: 20 });
+    a.edge('gw-bk', 'gw', 'booking', { sides: ['r', 'l'] });
+    a.O.text(580, 40, 'ElastiCache Redis · atomic Lua token bucket', 'o-h');
+    this.tokens = { alice: this.opts.burst, bot: this.opts.burst };
+    this.stats = { alice: { ok: 0, no: 0 }, bot: { ok: 0, no: 0 } };
+    this.buckets = {};
+    [['alice', 70], ['bot', 380]].forEach(([u, y]) => {
+      const g = O.g();
+      O.path(`M510,${u === 'alice' ? 262 : 312} C550,${u === 'alice' ? 262 : 312} 545,${y + 60} 580,${y + 60}`, 'o-line');
+      el('path', { d: `M580,${y} v118 a10,10 0 0 0 10,10 h170 a10,10 0 0 0 10,-10 v-118`, class: 'o-box', style: 'fill:var(--panel-2)' }, g);
+      const title = O.text(590, y + 20, `rl:{user:${u}}`, 'o-tb', 'start', g);
+      const info = O.text(590, y + 38, '', 'o-t', 'start', g);
+      const dots = [];
+      for (let i = 0; i < 10; i++) dots.push(el('circle', { cx: 608 + (i % 5) * 34, cy: y + 66 + Math.floor(i / 5) * 32, r: 11, class: 'f-ok' }, g));
+      this.buckets[u] = { info, dots, title };
+    });
+    this.statTxt = O.text(320, 372, '', 'o-t');
+    E.tickers.add((dt) => {
+      ['alice', 'bot'].forEach(u => { this.tokens[u] = Math.min(this.opts.burst, this.tokens[u] + this.opts.rate * dt / 1000); });
+      this.render();
+    });
+    this.render();
+  },
+  render() {
+    ['alice', 'bot'].forEach(u => {
+      const b = this.buckets[u], t = this.tokens[u];
+      b.dots.forEach((d, i) => {
+        if (i >= this.opts.burst) { d.setAttribute('opacity', '0'); return; }
+        const fill = Math.max(0, Math.min(1, t - i));
+        d.setAttribute('opacity', String(0.12 + 0.88 * fill));
+        d.setAttribute('class', fill >= 1 ? 'f-ok' : fill > 0 ? 'f-warn' : 'f-muted');
+      });
+      b.info.textContent = `tokens ${Math.floor(t)}/${this.opts.burst} · +${this.opts.rate}/s · allowed ${this.stats[u].ok} · 429 ${this.stats[u].no}`;
+    });
+  },
+  async request(a, u) {
+    await a.send(u + '-gw', { dur: 600 });
+    if (this.tokens[u] >= 1) {
+      this.tokens[u] -= 1; this.stats[u].ok++;
+      const rem = Math.floor(this.tokens[u]);
+      a.flash('gw', 'ok', 250);
+      await a.send('gw-bk', { dur: 550 });
+      await a.send('gw-bk', { reverse: true, color: 'ok', dur: 550 });
+      await a.send(u + '-gw', { reverse: true, color: 'ok', dur: 600, label: `201 · remaining ${rem}` });
+    } else {
+      this.stats[u].no++;
+      a.flash('gw', 'warn', 250);
+      if (this.stats[u].no % 4 === 1) a.log(`user:${u} bucket empty → 429 Retry-After: 1`, 'warn');
+      await a.send(u + '-gw', { reverse: true, color: 'err', dur: 600, label: '429 Retry-After 1' });
+    }
+  },
+  async burst(a, n) {
+    a.log(`bot fires ${n} requests at once`, 'req');
+    for (let i = 0; i < n; i++) { a.spawn(() => this.request(a, 'bot')); await a.wait(70); }
+  },
+  async run(a) {
+    a.say('Two users, two buckets', 'Alice books now and then and always finds a token. The bot bursts: the first few requests drain its bucket and the rest get 429. Its quota cannot spill into Alice\'s.');
+    a.spawn(async () => { while (true) { if (this.opts.hammer) a.spawn(() => this.request(a, 'bot')); await a.wait(160); } });
+    a.spawn(async () => { while (true) { await a.wait(2600); if (this.opts.auto) a.spawn(() => this.request(a, 'alice')); } });
+    while (true) { await a.wait(1500); if (this.opts.auto && !this.opts.hammer) await this.burst(a, 10); await a.wait(6500); }
+  },
+});
+
+/* ---------- 5. Throttling ---------- */
+scenes.push({
+  id: 'throttling', tab: 'Throttling',
+  title: 'Throttling: load shedding vs waiting for capacity',
+  sub: 'Rate limits cap requests over time. Throttling caps how much work runs at once: shed the excess immediately (gateway), or queue it and release it at a safe pace (Stripe).',
+  opts: { mode: 'shed', arrival: 6, slots: 6, latency: 700, budget: 3, throttle: true, auto: true },
+  cfg: [['Gateway in-flight cap', '2000 / pod (MAX_INFLIGHT_REQUESTS)'], ['Saga bulkhead', '200 concurrent / pod → 503'], ['Saga rate limiter', '300 starts/s / pod → 429'], ['Stripe budget', '80 req/s cluster-wide, wait ≤ 2 s'], ['SES budget', 'account quota, wait ≤ 10 s'], ['Hikari pool', '20 connections / pod']],
+  refs: [['api-gateway/…/filter/LoadSheddingFilter.java', 'semaphore → 503 + Retry-After'], ['booking-service/…/saga/BookingSagaOrchestrator.java', '@Bulkhead + @RateLimiter'], ['common-lib/…/ratelimit/DistributedRateLimiter.java', 'acquire(key, spec, maxWait)'], ['payment-service/…/gateway/StripePaymentGateway.java', 'call() waits for a Stripe token'], ['notification-service/…/messaging/NotificationDispatcher.java', 'SES send-rate throttle']],
+  controls: [
+    { type: 'seg', label: 'mode', key: 'mode', restart: true, options: [['shed', 'Load shedding'], ['wait', 'Throttle (wait)']] },
+    { type: 'range', label: 'arrivals /s', key: 'arrival', min: 2, max: 14, step: 1 },
+    { type: 'range', label: 'max in-flight', key: 'slots', min: 2, max: 10, step: 1, when: 'shed' },
+    { type: 'range', label: 'backend ms', key: 'latency', min: 300, max: 3000, step: 100, when: 'shed' },
+    { type: 'range', label: 'Stripe budget /s', key: 'budget', min: 1, max: 8, step: 1, when: 'wait' },
+    { type: 'toggle', label: 'Throttle on', key: 'throttle', when: 'wait' },
+    { type: 'toggle', label: 'Auto demo', key: 'auto' },
+  ],
+  build(a) {
+    this.inflight = 0; this.shed = 0; this.done = 0; this.queue = []; this.gaveUp = 0; this.stripeHits = []; this.s429 = 0;
+    if (this.opts.mode === 'shed') {
+      a.node({ id: 'c', x: 30, y: 250, w: 140, h: 70, t: 'clients', s: 'arrivals', kind: 'client' });
+      a.node({ id: 'gw', x: 320, y: 196, w: 270, h: 180, t: 'api-gateway pod', s: 'LoadSheddingFilter\nSemaphore(max in-flight)', kind: 'gw' });
+      a.node({ id: 'svc', x: 800, y: 250, w: 170, h: 70, t: 'booking-service', s: 'latency' });
+      a.edge('c-gw', 'c', 'gw', { sides: ['r', 'l'] });
+      a.edge('gw-svc', 'gw', 'svc', { sides: ['r', 'l'] });
+      this.slotEls = [];
+      for (let i = 0; i < 10; i++) this.slotEls.push(el('rect', { x: 336 + i * 24, y: 290, width: 20, height: 34, rx: 4, class: 'cell f-muted' }, E.layers.over));
+      O.text(336, 282, 'in-flight slots', 'o-t');
+      this.statTxt = O.text(336, 350, '', 'o-tb');
+    } else {
+      a.node({ id: 'c', x: 30, y: 250, w: 150, h: 70, t: 'payment pods ×3', s: 'createIntent()', kind: 'client' });
+      a.node({ id: 'gw', x: 310, y: 196, w: 300, h: 180, t: 'DistributedRateLimiter', s: 'acquire("stripe-api", maxWait 2 s)\nRedis token bucket, shared by pods', kind: 'gw' });
+      a.node({ id: 'svc', x: 810, y: 250, w: 160, h: 70, t: 'Stripe API', s: 'hard limit', kind: 'ext' });
+      a.edge('c-gw', 'c', 'gw', { sides: ['r', 'l'] });
+      a.edge('gw-svc', 'gw', 'svc', { sides: ['r', 'l'] });
+      this.qEls = [];
+      for (let i = 0; i < 10; i++) this.qEls.push(el('circle', { cx: 334 + i * 26, cy: 308, r: 9, class: 'f-muted' }, E.layers.over));
+      O.text(326, 290, 'waiting callers (FIFO)', 'o-t');
+      this.statTxt = O.text(326, 350, '', 'o-tb');
+    }
+    E.tickers.add(() => this.render(a));
+    this.render(a);
+  },
+  render(a) {
+    if (this.opts.mode === 'shed') {
+      this.slotEls.forEach((s, i) => {
+        s.setAttribute('opacity', i < this.opts.slots ? '1' : '0');
+        s.setAttribute('class', 'cell ' + (i < this.inflight ? (this.inflight >= this.opts.slots ? 'f-warn' : 'f-req') : 'f-muted'));
+      });
+      this.statTxt.textContent = `in-flight ${this.inflight}/${this.opts.slots} · served ${this.done} · shed (503) ${this.shed}`;
+      a.setSub('svc', `latency ${this.opts.latency} ms` + (this.opts.latency >= 1800 ? '\nDEGRADED' : ''));
+      a.setState('svc', this.opts.latency >= 1800 ? 'warn' : '');
+    } else {
+      this.qEls.forEach((q, i) => q.setAttribute('class', i < this.queue.length ? (this.opts.throttle ? 'f-warn' : 'f-muted') : 'f-muted'));
+      this.statTxt.textContent = this.opts.throttle
+        ? `queued ${this.queue.length} · sent ${this.done} · gave up ${this.gaveUp} · Stripe 429s ${this.s429}`
+        : `throttle OFF · sent ${this.done} · Stripe 429s ${this.s429}`;
+      a.setSub('svc', `hard limit 5 req/s (demo)\n429s received ${this.s429}`);
+    }
+  },
+  async shedReq(a) {
+    await a.send('c-gw', { dur: 550 });
+    if (this.inflight >= this.opts.slots) {
+      this.shed++; a.flash('gw', 'warn', 250);
+      if (this.shed % 5 === 1) a.log('all slots busy → 503 Retry-After: 1 (shed)', 'warn');
+      await a.send('c-gw', { reverse: true, color: 'warn', dur: 450, label: '503' });
+      return;
+    }
+    this.inflight++;
+    try {
+      await a.send('gw-svc', { dur: 500 });
+      await a.wait(this.opts.latency);
+      await a.send('gw-svc', { reverse: true, color: 'ok', dur: 500 });
+    } finally { this.inflight--; }
+    this.done++;
+    await a.send('c-gw', { reverse: true, color: 'ok', dur: 550 });
+  },
+  async stripeCall(a) {
+    const now = E.sim;
+    this.stripeHits = this.stripeHits.filter(t => now - t < 1000);
+    this.stripeHits.push(now);
+    await a.send('gw-svc', { dur: 500 });
+    const over = this.stripeHits.length > 5;
+    if (over) { this.s429++; a.flash('svc', 'err', 300); a.log('Stripe: rate limit exceeded → 429', 'err'); }
+    await a.send('gw-svc', { reverse: true, color: over ? 'err' : 'ok', dur: 500, label: over ? '429' : '' });
+    this.done++;
+    return !over;
+  },
+  async waitReq(a) {
+    await a.send('c-gw', { dur: 550 });
+    if (!this.opts.throttle) {
+      const ok = await this.stripeCall(a);
+      await a.send('c-gw', { reverse: true, color: ok ? 'ok' : 'err', dur: 550 });
+      return;
+    }
+    let resolve;
+    const ticket = { at: E.sim, go: new Promise(r => { resolve = r; }) };
+    ticket.resolve = resolve;
+    this.queue.push(ticket);
+    const outcome = await ticket.go;
+    if (outcome === 'timeout') {
+      this.gaveUp++;
+      await a.send('c-gw', { reverse: true, color: 'warn', dur: 550, label: 'retry later' });
+      return;
+    }
+    await this.stripeCall(a);
+    await a.send('c-gw', { reverse: true, color: 'ok', dur: 550 });
+  },
+  async run(a) {
+    if (this.opts.mode === 'shed') {
+      a.say('Concurrency cap at the gateway', 'Every request holds a slot until booking answers. When booking slows down, slots fill. Past the cap, new requests get an instant 503 instead of piling up.');
+      a.spawn(async () => { while (true) { a.spawn(() => this.shedReq(a)); await a.wait(1000 / this.opts.arrival); } });
+      while (true) {
+        await a.wait(7000);
+        if (!this.opts.auto) continue;
+        const degraded = this.opts.latency < 1800;
+        this.opts.latency = degraded ? 2600 : 700; syncControls(this);
+        a.log(degraded ? 'auto demo: booking-service degrades (2.6 s)' : 'auto demo: booking-service recovers (0.7 s)', degraded ? 'warn' : 'ok');
+        a.say(degraded ? 'Backend degraded' : 'Backend recovered', degraded ? 'Latency rises, in-flight requests pile up, and the gateway sheds the overflow with 503s while the HPA adds pods.' : 'Slots drain and every request is served again.');
+      }
+    } else {
+      a.say('Waiting for capacity', 'Payment pods share one Redis budget for Stripe. Instead of sending a burst and getting 429s back from Stripe, callers wait their turn. Anyone still waiting after 2 s gives up and retries later.');
+      // releaser
+      a.spawn(async () => {
+        while (true) {
+          await a.wait(1000 / this.opts.budget);
+          const now = E.sim;
+          // expire tickets older than maxWait
+          while (this.queue.length && now - this.queue[0].at > 2000 * (this.opts.arrival > 10 ? 1 : 1.5)) { this.queue.shift().resolve('timeout'); }
+          const t = this.queue.shift();
+          if (t) t.resolve('go');
+        }
+      });
+      a.spawn(async () => { while (true) { await a.wait(1000 / this.opts.arrival * rnd(0.5, 1.5)); a.spawn(() => this.waitReq(a)); } });
+      while (true) {
+        await a.wait(9000);
+        if (!this.opts.auto) continue;
+        this.opts.throttle = !this.opts.throttle; syncControls(this);
+        this.queue.splice(0).forEach(t => t.resolve('go'));
+        a.log(this.opts.throttle ? 'auto demo: throttle ON (wait for token)' : 'auto demo: throttle OFF (fire immediately)', this.opts.throttle ? 'ok' : 'warn');
+        a.say(this.opts.throttle ? 'Throttle on' : 'Throttle off', this.opts.throttle ? 'Calls queue and are released at the budget rate, so Stripe never answers 429.' : 'Without the throttle, bursts exceed Stripe\'s limit and Stripe answers 429.');
+      }
+    }
+  },
+});
+
+/* ---------- 6. Distributed cache ---------- */
+scenes.push({
+  id: 'cache', tab: 'Distributed cache',
+  title: 'Cache-aside with Redis (catalog)',
+  sub: 'Reads check Redis first. On a miss, catalog loads from Aurora and writes the value back with a TTL. Writes evict the key, and sync=true collapses concurrent misses into a single database query.',
+  opts: { ttl: 8, auto: true },
+  cfg: [['show cache', 'TTL 10 min (demo: slider)'], ['event cache', 'TTL 5 min'], ['events-by-city', 'TTL 2 min'], ['Serializer', 'typed JSON, no default typing'], ['Stampede', '@Cacheable(sync = true)'], ['CDN', 'Cache-Control: public, max-age=30']],
+  refs: [['catalog-service/…/service/CatalogService.java', '@Cacheable / @CacheEvict'], ['catalog-service/…/config/CacheConfig.java', 'per-cache TTL + serializers'], ['seat-inventory-service/…/api/SeatMapCache.java', '2 s micro-cache for hot seat maps']],
+  controls: [
+    { type: 'button', label: 'Read show 42', act: (a, s) => a.spawn(() => s.read(a)) },
+    { type: 'button', label: 'Burst of 8 reads', act: (a, s) => a.spawn(async () => { for (let i = 0; i < 8; i++) { a.spawn(() => s.read(a)); await a.wait(90); } }) },
+    { type: 'button', label: 'Admin updates show', act: (a, s) => a.spawn(() => s.update(a)) },
+    { type: 'range', label: 'TTL s', key: 'ttl', min: 3, max: 20, step: 1 },
+    { type: 'toggle', label: 'Auto traffic', key: 'auto' },
+  ],
+  build(a) {
+    a.node({ id: 'c', x: 30, y: 180, w: 150, h: 64, t: 'visitors', s: 'GET /shows/42', kind: 'client' });
+    a.node({ id: 'admin', x: 30, y: 430, w: 150, h: 60, t: 'admin', s: 'POST update', kind: 'client' });
+    a.node({ id: 'cat', x: 320, y: 250, w: 210, h: 92, t: 'catalog-service', s: '@Cacheable("show", sync=true)\n@CacheEvict on write' });
+    a.node({ id: 'redis', x: 700, y: 60, w: 200, h: 70, t: 'Redis', s: 'cache: catalog::show', kind: 'data' });
+    a.node({ id: 'db', x: 700, y: 420, w: 200, h: 70, t: 'Aurora PostgreSQL', s: 'catalog_db', kind: 'data' });
+    a.edge('c-cat', 'c', 'cat', { sides: ['r', 'l'], d2: -14 });
+    a.edge('a-cat', 'admin', 'cat', { sides: ['r', 'l'], d2: 20 });
+    a.edge('cat-redis', 'cat', 'redis', { sides: ['r', 'l'], d1: -20 });
+    a.edge('cat-db', 'cat', 'db', { sides: ['r', 'l'], d1: 20 });
+    // key widget
+    this.kg = O.g();
+    O.rect(700, 150, 200, 64, 'o-box', 8, this.kg);
+    this.kLabel = O.text(712, 172, 'catalog::show::42', 'o-tb', 'start', this.kg);
+    this.kState = O.text(712, 190, '(empty)', 'o-t', 'start', this.kg);
+    O.rect(712, 198, 176, 6, 'o-box', 3, this.kg);
+    this.kBar = el('rect', { x: 712, y: 198, width: 0, height: 6, rx: 3, class: 'f-data' }, this.kg);
+    this.stat = O.text(320, 372, '', 'o-tb');
+    this.stat2 = O.text(320, 390, '', 'o-t');
+    this.cached = false; this.ttlLeft = 0; this.loading = null; this.n = { hit: 0, miss: 0, db: 0, waited: 0 }; this.lat = [];
+    E.tickers.add((dt) => {
+      if (this.cached) { this.ttlLeft -= dt; if (this.ttlLeft <= 0) { this.cached = false; a.log('TTL expired → key gone', 'warn'); } }
+      this.render();
+    });
+    this.render();
+  },
+  render() {
+    this.kState.textContent = this.cached ? `cached · TTL ${(this.ttlLeft / 1000).toFixed(1)} s` : this.loading ? 'loading…' : '(empty)';
+    this.kBar.setAttribute('width', this.cached ? String(176 * Math.max(0, this.ttlLeft) / (this.opts.ttl * 1000)) : '0');
+    const total = this.n.hit + this.n.miss;
+    this.stat.textContent = `hits ${this.n.hit} · misses ${this.n.miss} · DB queries ${this.n.db}`;
+    const avg = this.lat.length ? this.lat.reduce((s, v) => s + v, 0) / this.lat.length : 0;
+    this.stat2.textContent = `hit ratio ${total ? Math.round(100 * this.n.hit / total) : 0} % · avg latency ${avg.toFixed(1)} ms · waited on sync ${this.n.waited}`;
+  },
+  pushLat(v) { this.lat.push(v); if (this.lat.length > 30) this.lat.shift(); },
+  async read(a) {
+    await a.send('c-cat', { dur: 550 });
+    if (this.loading) {
+      this.n.waited++; a.flash('cat', 'warn', 300);
+      a.log('concurrent miss waits for the in-flight load (sync=true)', 'warn');
+      await this.loading;
+      this.n.hit++; this.pushLat(26);
+      await a.send('c-cat', { reverse: true, color: 'ok', dur: 550, label: 'from fresh cache' });
+      return;
+    }
+    await a.send('cat-redis', { dur: 500, label: 'GET' });
+    if (this.cached) {
+      this.n.hit++; this.pushLat(1.2);
+      await a.send('cat-redis', { reverse: true, color: 'ok', dur: 500, label: 'HIT' });
+      await a.send('c-cat', { reverse: true, color: 'ok', dur: 550, label: '200 · 1 ms' });
+      return;
+    }
+    this.n.miss++;
+    await a.send('cat-redis', { reverse: true, color: 'warn', dur: 500, label: 'MISS' });
+    let done;
+    this.loading = new Promise(r => { done = r; });
+    try {
+      a.setState('db', 'busy');
+      await a.send('cat-db', { dur: 600, label: 'SELECT show' });
+      await a.wait(500); this.n.db++;
+      await a.send('cat-db', { reverse: true, color: 'ok', dur: 600 });
+      a.setState('db', '');
+      await a.send('cat-redis', { dur: 500, label: `SET ttl ${this.opts.ttl}s` });
+      this.cached = true; this.ttlLeft = this.opts.ttl * 1000;
+      a.flash('redis', 'ok', 400);
+      a.log(`miss → loaded from Aurora (25 ms) → cached for ${this.opts.ttl}s`, 'req');
+    } finally { this.loading = null; done(); }
+    this.pushLat(25);
+    await a.send('c-cat', { reverse: true, color: 'ok', dur: 550, label: '200 · 25 ms' });
+  },
+  async update(a) {
+    await a.send('a-cat', { dur: 600, label: 'update price' });
+    await a.send('cat-db', { dur: 600, label: 'UPDATE' });
+    await a.send('cat-db', { reverse: true, color: 'ok', dur: 600 });
+    await a.send('cat-redis', { dur: 500, color: 'warn', label: 'DEL (evict)' });
+    this.cached = false; a.flash('redis', 'warn', 500);
+    a.log('@CacheEvict: key deleted, next read reloads fresh data', 'warn');
+    await a.send('a-cat', { reverse: true, color: 'ok', dur: 600, label: '200' });
+  },
+  async run(a) {
+    a.say('Read-heavy traffic', 'The first read misses and loads from Aurora. Reads that follow are 1 ms hits until the TTL runs out or an admin update evicts the key.');
+    let k = 0;
+    while (true) {
+      await a.wait(1100);
+      if (!this.opts.auto) continue;
+      k++;
+      if (k % 14 === 0) { a.spawn(() => this.update(a)); continue; }
+      if (k % 9 === 0) { for (let i = 0; i < 5; i++) { a.spawn(() => this.read(a)); await a.wait(80); } continue; }
+      a.spawn(() => this.read(a));
+    }
+  },
+});
+
+/* ---------- 7. Seat locking ---------- */
+scenes.push({
+  id: 'seat-locking', tab: 'Seat locking',
+  title: 'Concurrent seat selection: Redis lock + database truth',
+  sub: 'Four users grab the same seats in the same instant. Redis decides in about 1 ms with an all-or-nothing Lua script. Postgres row locks plus the seat state machine stay the source of truth, even if Redis loses a key.',
+  cfg: [['Hold TTL', '10 min (PX in Redis + hold_expires_at)'], ['Key', 'seat-hold:{showId}:A-1 (hash tag = one slot)'], ['DB lock', 'SELECT … ORDER BY seat FOR UPDATE'], ['lock_timeout', '3 s'], ['Admission throttle', '150 holds/s per show'], ['Final guard', 'UNIQUE (show_id, seat_number) + @Version']],
+  refs: [['seat-inventory-service/…/hold/SeatReservationService.java', 'throttle → Redis → DB'], ['seat-inventory-service/src/main/resources/scripts/hold_seats.lua', 'all-or-nothing hold'], ['seat-inventory-service/…/hold/SeatHoldCache.java', 'compare-and-delete release'], ['seat-inventory-service/…/domain/SeatRepository.java', 'ordered pessimistic lock'], ['seat-inventory-service/…/jobs/HoldExpirySweeper.java', 'returns expired holds']],
+  controls: [
+    { type: 'button', label: '▶ Rush: 4 users grab A-1, A-2', excl: true, act: (a, s) => a.exclusive(() => s.rush(a)) },
+    { type: 'button', label: 'Redis loses the key', excl: true, act: (a, s) => a.exclusive(() => s.failover(a)) },
+    { type: 'button', label: 'Hold expires', excl: true, act: (a, s) => a.exclusive(() => s.expire(a)) },
+  ],
+  build(a) {
+    for (let i = 1; i <= 4; i++) a.node({ id: 'u' + i, x: 20, y: 36 + (i - 1) * 136, w: 130, h: 58, t: 'user ' + i, s: 'wants A-1, A-2', kind: 'client' });
+    a.node({ id: 'inv', x: 290, y: 250, w: 210, h: 92, t: 'seat-inventory', s: 'SeatReservationService\nthrottle → Redis → DB', kind: 'svc' });
+    a.node({ id: 'redis', x: 600, y: 56, w: 220, h: 72, t: 'Redis · Lua', s: 'SET seat-hold:{42}:A-1 NX PX\n(all seats or none)', kind: 'data' });
+    a.node({ id: 'pg', x: 600, y: 440, w: 220, h: 72, t: 'PostgreSQL', s: 'SELECT … FOR UPDATE\nstate AVAILABLE → HELD', kind: 'data' });
+    for (let i = 1; i <= 4; i++) a.edge(`u${i}-inv`, 'u' + i, 'inv', { sides: ['r', 'l'], d2: (i - 2.5) * 16 });
+    a.edge('inv-redis', 'inv', 'redis', { sides: ['r', 'l'], d1: -20 });
+    a.edge('inv-pg', 'inv', 'pg', { sides: ['r', 'l'], d1: 20 });
+    this.keysTxt = O.text(600, 148, 'keys: (none)', 'o-t');
+    // seat map
+    O.text(856, 214, 'show 42 seat map', 'o-h');
+    this.seats = {};
+    ['A', 'B'].forEach((r, ri) => {
+      O.text(856, 250 + ri * 40, r, 'o-tb');
+      for (let s = 1; s <= 4; s++) {
+        const id = `${r}-${s}`;
+        const g = O.g();
+        el('rect', { x: 872 + (s - 1) * 30, y: 232 + ri * 40, width: 24, height: 26, rx: 5, class: 'f-ok' }, g);
+        this.seats[id] = g.firstChild;
+      }
+    });
+    O.text(856, 330, 'green = free', 'o-t'); O.text(856, 346, 'amber = held', 'o-t');
+    this.dbTxt = O.text(600, 534, '', 'o-t');
+    this.reset();
+  },
+  reset() {
+    this.redisKeys = {}; this.db = { 'A-1': null, 'A-2': null };
+    this.paint();
+  },
+  paint() {
+    Object.entries(this.seats).forEach(([id, r]) => {
+      const held = this.db[id];
+      r.setAttribute('class', held ? 'f-warn' : 'f-ok');
+    });
+    const keys = Object.entries(this.redisKeys);
+    this.keysTxt.textContent = keys.length ? 'keys: ' + keys.map(([k, v]) => `${k}→bk#${v}`).join('  ') : 'keys: (none)';
+    this.dbTxt.textContent = 'rows: ' + Object.entries(this.db).map(([k, v]) => `${k}=${v ? 'HELD(bk#' + v + ')' : 'AVAILABLE'}`).join('  ');
+  },
+  async attempt(a, i, label) {
+    await a.send(`u${i}-inv`, { dur: 650, label });
+    await a.send('inv-redis', { dur: 500, label: `Lua bk#${i}` });
+    // atomic in Redis: check all, then set all
+    const conflict = ['A-1', 'A-2'].filter(s => this.redisKeys[s] && this.redisKeys[s] !== i);
+    if (conflict.length) {
+      a.flash('redis', 'warn', 250);
+      await a.send('inv-redis', { reverse: true, color: 'err', dur: 450, label: 'conflict ' + conflict[0] });
+      a.log(`user ${i}: Redis conflict on ${conflict.join(',')} → rejected in ~1 ms`, 'err');
+      await a.send(`u${i}-inv`, { reverse: true, color: 'err', dur: 650, label: '409 unavailable' });
+      a.flash('u' + i, 'err', 900);
+      return false;
+    }
+    ['A-1', 'A-2'].forEach(s => { this.redisKeys[s] = i; });
+    this.paint();
+    await a.send('inv-redis', { reverse: true, color: 'ok', dur: 450, label: 'OK' });
+    a.setState('pg', 'busy');
+    await a.send('inv-pg', { dur: 600, label: 'FOR UPDATE' });
+    const taken = ['A-1', 'A-2'].filter(s => this.db[s] && this.db[s] !== i);
+    if (taken.length) {
+      a.setState('pg', 'err');
+      await a.send('inv-pg', { reverse: true, color: 'err', dur: 600, label: `HELD by bk#${this.db[taken[0]]}` });
+      a.setState('pg', '');
+      ['A-1', 'A-2'].forEach(s => { if (this.redisKeys[s] === i) delete this.redisKeys[s]; });
+      this.paint();
+      a.log(`user ${i}: passed Redis but the DB says HELD → rejected, no double booking`, 'err');
+      await a.send(`u${i}-inv`, { reverse: true, color: 'err', dur: 650, label: '409 unavailable' });
+      a.flash('u' + i, 'err', 900);
+      return false;
+    }
+    ['A-1', 'A-2'].forEach(s => { this.db[s] = i; });
+    this.paint(); a.setState('pg', '');
+    await a.send('inv-pg', { reverse: true, color: 'ok', dur: 600, label: 'HELD' });
+    a.log(`user ${i}: A-1, A-2 HELD for 10 min`, 'ok');
+    await a.send(`u${i}-inv`, { reverse: true, color: 'ok', dur: 650, label: 'held · pay in 8 min' });
+    a.flash('u' + i, 'ok', 1200);
+    return true;
+  },
+  async rush(a) {
+    this.reset(); for (let i = 1; i <= 4; i++) a.setState('u' + i, '');
+    a.say('Everyone clicks at once', 'All four requests reach inventory within milliseconds. The first Lua script to run takes both seats atomically. The other three are rejected by Redis without touching Postgres.');
+    const order = [1, 2, 3, 4].sort(() => Math.random() - 0.5);
+    await Promise.all(order.map((i, k) => (async () => { await a.wait(k * 40); return this.attempt(a, i, 'hold A-1,A-2'); })()));
+    a.say('Exactly one winner', 'One booking holds the seats in Redis and in the database. Try "Redis loses the key" to see why the database check still matters.');
+  },
+  async failover(a) {
+    if (!this.db['A-1']) { a.log('No hold yet: running the rush first', 'warn'); await this.rush(a); await a.wait(600); }
+    const owner = this.db['A-1'];
+    const other = [1, 2, 3, 4].find(i => i !== owner);
+    a.say('Redis failover', 'ElastiCache replication is asynchronous, so a promoted replica can be missing the hold key. The next user passes the Redis check, and Postgres stops them.');
+    a.setState('redis', 'err'); a.log('Redis primary failover: hold keys lost', 'err');
+    this.redisKeys = {}; this.paint();
+    await a.wait(700); a.setState('redis', '');
+    await this.attempt(a, other, 'retry hold');
+    a.say('Correct anyway', 'Redis absorbs the contention and the database guarantees correctness. Seats are never sold twice.');
+  },
+  async expire(a) {
+    if (!this.db['A-1']) { a.log('Nothing held right now', 'warn'); return; }
+    a.say('Abandoned hold', 'The user never paid. The Redis key expires by TTL, and the sweeper (one replica, ShedLock) returns the rows to AVAILABLE.');
+    a.log('… 10 minutes pass', 'warn');
+    await a.wait(800);
+    this.redisKeys = {}; this.paint(); a.flash('redis', 'ok', 500);
+    await a.send('inv-pg', { dur: 600, label: 'sweeper: release expired' });
+    this.db = { 'A-1': null, 'A-2': null }; this.paint();
+    await a.send('inv-pg', { reverse: true, color: 'ok', dur: 600, label: 'AVAILABLE' });
+    a.log('A-1, A-2 back on sale', 'ok');
+  },
+  async run(a) { await a.wait(500); await this.rush(a); },
+});
+
+/* ---------- 8. Outbox + inbox ---------- */
+scenes.push({
+  id: 'outbox', tab: 'Outbox & inbox',
+  title: 'Transactional outbox + idempotent consumer',
+  sub: 'The state change and its event commit in one local transaction. A relay publishes the outbox rows to Kafka, and consumers drop duplicate deliveries using a processed-event table.',
+  cfg: [['Relay poll', 'every 250 ms, batch 100'], ['Concurrency', 'FOR UPDATE SKIP LOCKED (no leader)'], ['Producer', 'acks=all, enable.idempotence=true'], ['Delivery', 'at least once → inbox dedup'], ['Retention', 'published rows purged after 7 days'], ['Scale-up option', 'Debezium CDC on MSK Connect']],
+  refs: [['common-lib/…/messaging/OutboxService.java', 'record() with MANDATORY propagation'], ['common-lib/…/messaging/OutboxRelay.java', 'poll, publish, mark published'], ['common-lib/…/messaging/InboxGuard.java', 'firstDelivery(consumer, eventId)'], ['payment-service/…/service/PaymentService.java', 'state change + outbox in one tx']],
+  controls: [
+    { type: 'button', label: '▶ Payment succeeds', excl: true, act: (a, s) => a.exclusive(() => s.flow(a, 'ok')) },
+    { type: 'button', label: 'Relay crashes after publish', excl: true, act: (a, s) => a.exclusive(() => s.flow(a, 'dup')) },
+    { type: 'button', label: 'Without outbox (dual write)', excl: true, act: (a, s) => a.exclusive(() => s.flow(a, 'dual')) },
+  ],
+  build(a) {
+    a.node({ id: 'pay', x: 30, y: 236, w: 180, h: 84, t: 'payment-service', s: 'webhook: succeeded' });
+    a.node({ id: 'pg', x: 300, y: 40, w: 270, h: 150, t: 'payment_db', s: 'one local transaction', kind: 'data' });
+    a.node({ id: 'relay', x: 300, y: 410, w: 270, h: 80, t: 'OutboxRelay (every pod)', s: 'SELECT … FOR UPDATE SKIP LOCKED', kind: 'gw' });
+    a.node({ id: 'kafka', x: 650, y: 246, w: 140, h: 70, t: 'Kafka', s: 'payment.events', kind: 'bus' });
+    a.node({ id: 'bk', x: 840, y: 228, w: 150, h: 104, t: 'booking', s: 'InboxGuard\nprocessed_event', kind: 'svc' });
+    a.edge('pay-pg', 'pay', 'pg', { sides: ['r', 'l'] });
+    a.edge('relay-pg', 'relay', 'pg', { sides: ['t', 'b'] });
+    a.edge('relay-kafka', 'relay', 'kafka', { sides: ['r', 'b'] });
+    a.edge('kafka-bk', 'kafka', 'bk', { sides: ['r', 'l'] });
+    a.edge('pay-kafka', null, null, { d: 'M210,262 C430,262 540,262 650,268' });
+    this.rowPay = this.row(a, 312, 92, 'payment p-17', 'REQUIRES_PAYMENT');
+    this.rowOut = this.row(a, 312, 136, 'outbox_event', '—');
+    this.inbox = O.text(840, 352, 'processed: —', 'o-t');
+    this.bkState = O.text(840, 370, 'booking bk-9: PENDING_PAYMENT', 'o-t');
+    this.eventId = 'e-' + Math.floor(rnd(100, 999));
+    this.processed = new Set(); this.pending = false;
+  },
+  row(a, x, y, name, val) {
+    const g = O.g();
+    O.rect(x, y, 246, 34, 'o-box', 6, g);
+    O.text(x + 10, y + 21, name, 'o-tb', 'start', g);
+    const v = O.text(x + 236, y + 21, val, 'o-t', 'end', g);
+    return { g, v, box: g.firstChild };
+  },
+  async poll(a, crash) {
+    await a.send('relay-pg', { dur: 600, label: 'poll' });
+    if (!this.pending) { await a.send('relay-pg', { reverse: true, dur: 500, color: 'ok', label: '0 rows' }); return false; }
+    await a.send('relay-pg', { reverse: true, dur: 500, color: 'evt', label: '1 row (locked)' });
+    a.log(`relay publishes ${this.eventId} (key = booking id)`, 'evt');
+    await a.send('relay-kafka', { dur: 700, color: 'evt', label: 'PaymentSucceeded' });
+    a.spawn(() => this.consume(a));
+    if (crash) {
+      a.setState('relay', 'err'); a.log('relay pod crashed BEFORE marking the row published', 'err');
+      await a.wait(900); a.setState('relay', ''); a.log('a new pod takes over and polls again', 'warn');
+      return true;
+    }
+    await a.send('relay-pg', { dur: 500, color: 'ok', label: 'mark published' });
+    this.pending = false; this.rowOut.v.textContent = `${this.eventId} · published`; this.rowOut.box.setAttribute('class', 'o-box');
+    return true;
+  },
+  async consume(a) {
+    await a.send('kafka-bk', { dur: 700, color: 'evt' });
+    if (this.processed.has(this.eventId)) {
+      a.flash('bk', 'warn', 900);
+      a.log(`inbox: ${this.eventId} already processed → skipped (no double confirm)`, 'warn');
+      this.inbox.textContent = `processed: ${this.eventId} · duplicate skipped`;
+      return;
+    }
+    this.processed.add(this.eventId);
+    a.flash('bk', 'ok', 900);
+    this.inbox.textContent = `processed: ${this.eventId}`;
+    this.bkState.textContent = 'booking bk-9: CONFIRMED';
+    a.log(`inbox insert ${this.eventId} + booking CONFIRMED (same tx)`, 'ok');
+  },
+  async flow(a, mode) {
+    this.eventId = 'e-' + Math.floor(rnd(100, 999)); this.processed = new Set(); this.pending = false;
+    this.rowPay.v.textContent = 'REQUIRES_PAYMENT'; this.rowOut.v.textContent = '—'; this.inbox.textContent = 'processed: —'; this.bkState.textContent = 'booking bk-9: PENDING_PAYMENT';
+    ['pay', 'relay', 'bk', 'pg'].forEach(n => a.setState(n, ''));
+    if (mode === 'dual') {
+      a.say('Dual write: the problem', 'Without an outbox, the service commits to the database, then sends to Kafka. A crash between the two loses the event, so the payment is captured but the booking never hears about it.');
+      await a.send('pay-pg', { dur: 700, label: 'UPDATE; COMMIT' });
+      this.rowPay.v.textContent = 'SUCCEEDED'; a.flash('pg', 'ok', 600);
+      await a.send('pay-pg', { reverse: true, color: 'ok', dur: 500 });
+      a.setState('pay', 'err');
+      await a.send('pay-kafka', { dur: 900, upto: 0.45, color: 'err', label: 'send…', drop: true });
+      a.log('process crashed before kafkaTemplate.send(): event LOST', 'err');
+      this.bkState.textContent = 'booking bk-9: PENDING_PAYMENT (stuck)';
+      a.flash('bk', 'err', 1400);
+      a.say('Inconsistent', 'Money is captured, but the booking is stuck in PENDING_PAYMENT. The outbox removes this failure window, and reconciliation catches anything left over.');
+      await a.wait(900); a.setState('pay', '');
+      return;
+    }
+    a.say('One local transaction', 'UPDATE payment and INSERT outbox_event commit together, or not at all.');
+    a.setState('pg', 'busy');
+    await a.send('pay-pg', { dur: 800, label: 'BEGIN · UPDATE · INSERT · COMMIT' });
+    this.rowPay.v.textContent = 'SUCCEEDED'; this.rowOut.v.textContent = `${this.eventId} · unpublished`;
+    this.rowPay.box.setAttribute('class', 'o-box s-ok'); this.rowOut.box.setAttribute('class', 'o-box s-ok');
+    this.pending = true; a.setState('pg', 'ok');
+    await a.send('pay-pg', { reverse: true, color: 'ok', dur: 500, label: 'committed' });
+    a.setState('pg', '');
+    this.rowPay.box.setAttribute('class', 'o-box');
+    a.say('Relay publishes', 'Every pod polls with SKIP LOCKED, so each row is claimed by exactly one pod. The row is published to Kafka and marked published after the broker acks.');
+    await this.poll(a, mode === 'dup');
+    if (mode === 'dup') {
+      await a.wait(600);
+      a.say('Duplicate delivery', 'The row was never marked published, so the next poll publishes it again. The booking\'s InboxGuard recognises the event id and skips it.');
+      await this.poll(a, false);
+    }
+    await a.wait(1200);
+  },
+  async run(a) { await a.wait(400); await this.flow(a, 'ok'); a.say('Try the failure cases', 'Relay crash shows at-least-once delivery handled by the inbox. Dual write shows the bug the outbox prevents.'); },
+});
+
+/* ---------- 9. Idempotency key ---------- */
+scenes.push({
+  id: 'idempotency', tab: 'Idempotency key',
+  title: 'Idempotency-Key on POST /bookings',
+  sub: 'The client sends a unique key per booking intent and reuses it on retries. Redis SET NX makes duplicate requests replay the first result instead of running the saga twice.',
+  cfg: [['Lock record', 'IN_PROGRESS, TTL 60 s'], ['Result record', 'COMPLETED + response, TTL 24 h'], ['Fingerprint', 'SHA-256(showId + sorted seats)'], ['Concurrent duplicate', '409 REQUEST_IN_PROGRESS'], ['Different body, same key', '422 IDEMPOTENCY_KEY_REUSED'], ['Redis lost', 'DB UNIQUE (user_id, idempotency_key)']],
+  refs: [['booking-service/…/idempotency/IdempotencyService.java', 'SET NX → execute → store / replay'], ['booking-service/…/api/BookingController.java', 'Idempotency-Key header + fingerprint'], ['booking-service/…/db/migration/V1__booking_schema.sql', 'unique constraints (durable backstop)']],
+  controls: [
+    { type: 'button', label: '▶ Double-click (same key)', excl: true, act: (a, s) => a.exclusive(() => s.double(a)) },
+    { type: 'button', label: 'Timeout, then retry', excl: true, act: (a, s) => a.exclusive(() => s.timeout(a)) },
+    { type: 'button', label: 'Same key, other seats', excl: true, act: (a, s) => a.exclusive(() => s.reuse(a)) },
+  ],
+  build(a) {
+    a.node({ id: 'c', x: 30, y: 246, w: 170, h: 76, t: 'alice', s: 'Idempotency-Key:\nK-7f3a', kind: 'client' });
+    a.node({ id: 'bk', x: 360, y: 236, w: 210, h: 96, t: 'booking-service', s: 'IdempotencyService', kind: 'gw' });
+    a.node({ id: 'redis', x: 700, y: 50, w: 270, h: 96, t: 'Redis', s: 'idem:booking:alice:K-7f3a', kind: 'data' });
+    a.node({ id: 'saga', x: 700, y: 420, w: 270, h: 80, t: 'booking saga', s: 'hold seats + PaymentIntent', kind: 'svc' });
+    a.edge('c-bk1', 'c', 'bk', { sides: ['r', 'l'], d1: -16, d2: -16 });
+    a.edge('c-bk2', 'c', 'bk', { sides: ['r', 'l'], d1: 16, d2: 16 });
+    a.edge('bk-redis', 'bk', 'redis', { sides: ['r', 'l'], d1: -20 });
+    a.edge('bk-saga', 'bk', 'saga', { sides: ['r', 'l'], d1: 20 });
+    this.recTxt = O.text(712, 172, '', 'o-tb');
+    this.recTxt2 = O.text(712, 190, '', 'o-t');
+    this.sagaRuns = 0;
+    this.sagaTxt = O.text(700, 524, '', 'o-t');
+    this.rec = null;
+    this.paint();
+  },
+  paint() {
+    this.recTxt.textContent = this.rec ? `state: ${this.rec.state}` : 'record: (none)';
+    this.recTxt2.textContent = this.rec ? `hash: ${this.rec.hash}` + (this.rec.state === 'COMPLETED' ? ' · response: 201 bk-9' : '') : '';
+    this.sagaTxt.textContent = `saga executions: ${this.sagaRuns}`;
+  },
+  async req(a, lane, hash, opts = {}) {
+    const e = 'c-bk' + lane;
+    await a.send(e, { dur: 650, label: `POST · K-7f3a · ${hash}` });
+    await a.send('bk-redis', { dur: 500, label: 'SET NX' });
+    if (!this.rec) {
+      this.rec = { state: 'IN_PROGRESS', hash }; this.paint(); a.flash('redis', 'ok', 400);
+      await a.send('bk-redis', { reverse: true, color: 'ok', dur: 450, label: 'acquired' });
+      a.setState('saga', 'busy');
+      await a.send('bk-saga', { dur: 600, label: 'run saga' });
+      this.sagaRuns++; this.paint();
+      await a.wait(1600);
+      await a.send('bk-saga', { reverse: true, color: 'ok', dur: 600, label: 'bk-9' });
+      a.setState('saga', '');
+      await a.send('bk-redis', { dur: 500, label: 'store COMPLETED' });
+      this.rec.state = 'COMPLETED'; this.paint();
+      await a.send('bk-redis', { reverse: true, color: 'ok', dur: 450 });
+      if (opts.lose) {
+        await a.send(e, { reverse: true, color: 'err', dur: 650, upto: 0.55, label: '201 lost', drop: true });
+        a.log('network timeout: the client never saw the 201', 'err');
+        a.flash('c', 'err', 900);
+        return;
+      }
+      await a.send(e, { reverse: true, color: 'ok', dur: 650, label: '201 PENDING_PAYMENT' });
+      a.log('first request: saga executed, 201 returned', 'ok');
+      return;
+    }
+    await a.send('bk-redis', { reverse: true, color: 'warn', dur: 450, label: 'exists' });
+    await a.send('bk-redis', { dur: 450, label: 'GET' });
+    const r = this.rec;
+    await a.send('bk-redis', { reverse: true, color: 'warn', dur: 450, label: r.state });
+    if (r.hash !== hash) {
+      a.log('same key with a different request body → 422', 'err');
+      await a.send(e, { reverse: true, color: 'err', dur: 650, label: '422 KEY_REUSED' });
+      return;
+    }
+    if (r.state === 'IN_PROGRESS') {
+      a.log('duplicate while the first is still running → 409 in progress', 'warn');
+      await a.send(e, { reverse: true, color: 'warn', dur: 650, label: '409 IN_PROGRESS' });
+      return;
+    }
+    a.log('duplicate after completion → stored 201 replayed, saga not re-run', 'ok');
+    await a.send(e, { reverse: true, color: 'ok', dur: 650, label: '201 · Idempotent-Replayed' });
+  },
+  fresh(a) { this.rec = null; this.sagaRuns = 0; this.paint(); a.setState('c', ''); },
+  async double(a) {
+    this.fresh(a);
+    a.say('Double-click', 'Two identical requests arrive about 100 ms apart. Only the first acquires the key. The second sees IN_PROGRESS and gets 409, so the saga runs once.');
+    await Promise.all([this.req(a, 1, 'h:a1b2'), (async () => { await a.wait(260); await this.req(a, 2, 'h:a1b2'); })()]);
+    await a.wait(400);
+    a.say('Later retry', 'Once the first request completes, any retry with the same key gets the stored 201 back.');
+    await this.req(a, 2, 'h:a1b2');
+  },
+  async timeout(a) {
+    this.fresh(a);
+    a.say('Response lost', 'The booking succeeded, but the 201 was lost on the network. The client retries with the same key and receives the original response. No second hold, no second PaymentIntent.');
+    await this.req(a, 1, 'h:a1b2', { lose: true });
+    await a.wait(500);
+    await this.req(a, 1, 'h:a1b2');
+  },
+  async reuse(a) {
+    if (!this.rec || this.rec.state !== 'COMPLETED') { this.fresh(a); await this.req(a, 1, 'h:a1b2'); await a.wait(400); }
+    a.say('Key reuse', 'A key identifies exactly one intent. The same key with different seats is rejected with 422 rather than silently returning the old booking.');
+    await this.req(a, 2, 'h:c3d4');
+  },
+  async run(a) { await a.wait(400); await this.double(a); },
+});
+
+/* ===================== UI wiring ===================== */
+let current = null;
+const tabs = $('tabs');
+scenes.forEach(s => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.setAttribute('role', 'tab'); b.textContent = s.tab; b.dataset.id = s.id;
+  b.addEventListener('click', () => { if (location.hash !== '#' + s.id) location.hash = s.id; else select(s.id); });
+  tabs.appendChild(b);
+});
+
+function syncControls(s) {
+  if (s !== current) return;
+  document.querySelectorAll('#controls [data-key]').forEach(c => {
+    const k = c.dataset.key, v = s.opts[k];
+    if (c.classList.contains('seg')) c.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === String(v))));
+    else if (c.type === 'checkbox') c.checked = !!v;
+    else if (c.type === 'range') { c.value = v; const o = c.parentElement.querySelector('output'); if (o) o.textContent = v; }
+  });
+}
+
+function buildControls(s) {
+  const box = $('controls'); box.innerHTML = '';
+  (s.controls || []).forEach((c, idx) => {
+    if (c.when && s.opts.mode !== c.when) return;
+    const id = `ctl-${s.id}-${idx}`;
+    if (c.type === 'button') {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn' + (c.excl ? ' excl' : ''); b.id = id; b.textContent = c.label;
+      b.addEventListener('click', () => c.act(api, s));
+      box.appendChild(b);
+    } else if (c.type === 'toggle') {
+      const l = document.createElement('label'); const i = document.createElement('input'); i.type = 'checkbox'; i.id = id; i.dataset.key = c.key; i.checked = !!s.opts[c.key];
+      i.addEventListener('change', () => { s.opts[c.key] = i.checked; });
+      l.append(i, document.createTextNode(c.label)); box.appendChild(l);
+    } else if (c.type === 'range') {
+      const l = document.createElement('label'); l.htmlFor = id; l.append(document.createTextNode(c.label));
+      const i = document.createElement('input'); i.type = 'range'; i.id = id; i.min = c.min; i.max = c.max; i.step = c.step; i.value = s.opts[c.key]; i.dataset.key = c.key;
+      const o = document.createElement('output'); o.textContent = s.opts[c.key];
+      i.addEventListener('input', () => { s.opts[c.key] = Number(i.value); o.textContent = i.value; if (c.key === 'burst' && s.tokens) Object.keys(s.tokens).forEach(k => s.tokens[k] = Math.min(s.tokens[k], s.opts.burst)); });
+      l.append(i, o); box.appendChild(l);
+    } else if (c.type === 'seg') {
+      const wrap = document.createElement('label'); wrap.append(document.createTextNode(c.label));
+      const seg = document.createElement('div'); seg.className = 'seg'; seg.dataset.key = c.key; seg.setAttribute('role', 'group'); seg.id = id;
+      c.options.forEach(([v, t]) => {
+        const b = document.createElement('button'); b.type = 'button'; b.dataset.v = v; b.textContent = t; b.setAttribute('aria-pressed', String(s.opts[c.key] === v));
+        b.addEventListener('click', () => {
+          s.opts[c.key] = v;
+          if (c.restart) { select(s.id); return; }
+          if (s.id === 'circuit-breaker' && c.key === 'health') { s.setHealth(api, v); s.opts.auto = false; syncControls(s); return; }
+          syncControls(s);
+        });
+        seg.appendChild(b);
+      });
+      wrap.appendChild(seg); box.appendChild(wrap);
+    }
+  });
+}
+
+function select(id) {
+  const s = scenes.find(x => x.id === id) || scenes[0];
+  current = s;
+  tabs.querySelectorAll('button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.id === s.id)));
+  const tb = tabs.querySelector(`[data-id="${s.id}"]`); if (tb && tb.scrollIntoView) tb.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  resetEngine();
+  $('scene-title').textContent = s.title; $('scene-sub').textContent = s.sub;
+  $('cfg').innerHTML = ''; (s.cfg || []).forEach(([k, v]) => { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; $('cfg').append(dt, dd); });
+  $('refs').innerHTML = ''; (s.refs || []).forEach(([f, n]) => { const li = document.createElement('li'); const c = document.createElement('code'); c.textContent = f; const sp = document.createElement('span'); sp.textContent = n; li.append(c, sp); $('refs').appendChild(li); });
+  say('—', '');
+  s.build(api);
+  buildControls(s);
+  spawn(() => s.run(api));
+}
+
+$('btn-play').addEventListener('click', () => {
+  E.paused = !E.paused;
+  $('btn-play').textContent = E.paused ? '▶ Play' : '❚❚ Pause';
+  $('btn-play').setAttribute('aria-label', E.paused ? 'Play' : 'Pause');
+});
+$('btn-restart').addEventListener('click', () => select(current.id));
+$('speed').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+  E.speed = Number(b.dataset.v);
+  $('speed').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+}));
+window.addEventListener('hashchange', () => select(location.hash.slice(1)));
+select(location.hash.slice(1) || 'architecture');
+})();
+</script>
+
+</body></html>
