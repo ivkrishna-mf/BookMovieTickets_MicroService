@@ -1,0 +1,42 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+images:
+  - { name: bmtickets/api-gateway, newName: <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/bmtickets/api-gateway, newTag: dev }
+  - { name: bmtickets/catalog-service, newName: <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/bmtickets/catalog-service, newTag: dev }
+  - { name: bmtickets/seat-inventory-service, newName: <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/bmtickets/seat-inventory-service, newTag: dev }
+  - { name: bmtickets/booking-service, newName: <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/bmtickets/booking-service, newTag: dev }
+  - { name: bmtickets/payment-service, newName: <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/bmtickets/payment-service, newTag: dev }
+  - { name: bmtickets/notification-service, newName: <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/bmtickets/notification-service, newTag: dev }
+patches:
+  # small footprint: 1 replica, HPA up to 3
+  - target: { kind: Deployment }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target: { kind: HorizontalPodAutoscaler }
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3
+  - target: { kind: ScaledObject }
+    patch: |-
+      - op: replace
+        path: /spec/minReplicaCount
+        value: 1
+  - target: { kind: ConfigMap, name: platform-config }
+    patch: |-
+      - op: replace
+        path: /data/TRACING_SAMPLING_PROBABILITY
+        value: "1.0"
+      - op: replace
+        path: /data/KAFKA_PARTITIONS
+        value: "6"
+      - op: replace
+        path: /data/SWAGGER_ENABLED
+        value: "true"

@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: catalog-service
+  config:
+    import: classpath:bmtickets-defaults.yml
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/catalog_db}
+    username: ${DB_USERNAME:bmtickets}
+    password: ${DB_PASSWORD:bmtickets}
+  cache:
+    type: redis
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI:http://localhost:8180/realms/bmtickets}
+          jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8180/realms/bmtickets/protocol/openid-connect/certs}
+
+server:
+  port: ${SERVER_PORT:8081}
+
+grpc:
+  server:
+    port: ${GRPC_PORT:9091}
+    max-inbound-message-size: 1MB
+    keep-alive-time: 30s
+    permit-keep-alive-time: 10s
+    permit-keep-alive-without-calls: true
+
+app:
+  outbox:
+    enabled: true
+  kafka:
+    partitions: ${KAFKA_PARTITIONS:12}
+    replicas: ${KAFKA_REPLICAS:1}
+  grpc:
+    auth-enabled: ${GRPC_AUTH_ENABLED:true}
+  security:
+    internal-authority: ${INTERNAL_AUTHORITY:SCOPE_internal}
+    public-get-paths:
+      - /api/v1/catalog/**

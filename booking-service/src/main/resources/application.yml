@@ -1,0 +1,131 @@
+spring:
+  application:
+    name: booking-service
+  config:
+    import: classpath:bmtickets-defaults.yml
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/booking_db}
+    username: ${DB_USERNAME:bmtickets}
+    password: ${DB_PASSWORD:bmtickets}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI:http://localhost:8180/realms/bmtickets}
+          jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8180/realms/bmtickets/protocol/openid-connect/certs}
+      client:
+        registration:
+          service-client:
+            provider: idp
+            client-id: ${SERVICE_CLIENT_ID:booking-service}
+            client-secret: ${SERVICE_CLIENT_SECRET:booking-service-secret}
+            authorization-grant-type: client_credentials
+            scope: ${SERVICE_CLIENT_SCOPE:profile}       # Cognito: bmtickets/internal
+        provider:
+          idp:
+            token-uri: ${OAUTH_TOKEN_URI:http://localhost:8180/realms/bmtickets/protocol/openid-connect/token}
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connect-timeout: 2000
+            read-timeout: 5000
+            logger-level: basic
+      micrometer:
+        enabled: true
+
+server:
+  port: ${SERVER_PORT:8083}
+
+# ---------------- gRPC clients (HTTP/2, protobuf) ----------------
+grpc:
+  client:
+    catalog:
+      address: ${GRPC_CATALOG_ADDRESS:discovery:///catalog-service}
+      negotiation-type: ${GRPC_NEGOTIATION:plaintext}       # TLS via service mesh / NLB in AWS
+      default-load-balancing-policy: round_robin            # per-request balancing over long-lived HTTP/2
+      enable-keep-alive: true
+      keep-alive-time: 30s
+    seat-inventory:
+      address: ${GRPC_INVENTORY_ADDRESS:discovery:///seat-inventory-service}
+      negotiation-type: ${GRPC_NEGOTIATION:plaintext}
+      default-load-balancing-policy: round_robin
+      enable-keep-alive: true
+      keep-alive-time: 30s
+
+# ---------------- resilience ----------------
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 50
+        minimum-number-of-calls: 20
+        failure-rate-threshold: 50
+        slow-call-duration-threshold: 2s
+        slow-call-rate-threshold: 80
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 5
+        automatic-transition-from-open-to-half-open-enabled: true
+        register-health-indicator: true
+        ignore-exceptions:
+          - com.bmtickets.common.error.BusinessException
+    instances:
+      catalog:
+        base-config: default
+      inventory:
+        base-config: default
+      payment:
+        base-config: default
+        slow-call-duration-threshold: 4s
+  retry:
+    configs:
+      default:
+        max-attempts: 3
+        wait-duration: 200ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        enable-randomized-wait: true          # jitter: avoid synchronized retry storms
+        randomized-wait-factor: 0.5
+        ignore-exceptions:
+          - com.bmtickets.common.error.BusinessException
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
+    instances:
+      catalog:
+        base-config: default
+      inventory:
+        base-config: default
+      payment:
+        base-config: default
+        max-attempts: 2
+  bulkhead:
+    instances:
+      createBooking:
+        max-concurrent-calls: ${BOOKING_MAX_CONCURRENT_SAGAS:200}   # per pod
+        max-wait-duration: 100ms
+  ratelimiter:
+    instances:
+      createBooking:
+        limit-for-period: ${BOOKING_MAX_SAGAS_PER_SEC:300}          # per pod per second
+        limit-refresh-period: 1s
+        timeout-duration: 0s                                          # reject immediately, don't queue
+        register-health-indicator: false
+
+app:
+  outbox:
+    enabled: true
+  kafka:
+    partitions: ${KAFKA_PARTITIONS:12}
+    replicas: ${KAFKA_REPLICAS:1}
+    listener-concurrency: ${KAFKA_LISTENER_CONCURRENCY:3}
+  booking:
+    payment-window: ${PAYMENT_WINDOW:PT8M}
+    seat-hold-ttl: ${SEAT_HOLD_TTL:PT10M}
+    attempts-per-user-show: ${BOOKING_ATTEMPTS_PER_USER_SHOW:10}
+    attempts-refill-per-hour: ${BOOKING_ATTEMPTS_REFILL_PER_HOUR:10}
+  idempotency:
+    lock-ttl: PT60S
+    result-ttl: PT24H
+  ticket:
+    signing-key: ${TICKET_SIGNING_KEY}

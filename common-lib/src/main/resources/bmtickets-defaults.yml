@@ -1,0 +1,130 @@
+# Shared defaults for every servlet microservice, imported with
+#   spring.config.import: classpath:bmtickets-defaults.yml
+# Twelve-factor: every environment-specific value is an env var with a local-dev default.
+server:
+  shutdown: graceful                       # finish in-flight requests on SIGTERM (rolling deploys)
+  tomcat:
+    threads:
+      max: 200
+    accept-count: 100                      # bounded accept queue => back-pressure instead of unbounded latency
+
+spring:
+  threads:
+    virtual:
+      enabled: true                        # Java 21 virtual threads: cheap blocking I/O for high concurrency
+  lifecycle:
+    timeout-per-shutdown-phase: 25s
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate                   # schema owned by Flyway migrations
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}  # bounded pool = natural DB throttle; size against RDS Proxy limits
+      minimum-idle: 5
+      connection-timeout: 3000
+      max-lifetime: 1500000
+  flyway:
+    enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      ssl:
+        enabled: ${REDIS_SSL:false}
+      timeout: 500ms
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    security:
+      protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}   # MSK: SSL (TLS) or SASL_SSL (IAM)
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true            # no duplicates from producer retries
+        max.in.flight.requests.per.connection: 5
+        linger.ms: 5
+        compression.type: lz4
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      max-poll-records: ${KAFKA_MAX_POLL_RECORDS:50}    # consumer-side throttling
+      properties:
+        isolation.level: read_committed
+    listener:
+      ack-mode: record
+      observation-enabled: true             # trace context propagated through Kafka headers
+    template:
+      observation-enabled: true
+  cloud:
+    kubernetes:
+      config:
+        enabled: false
+      secrets:
+        enabled: false
+      loadbalancer:
+        mode: SERVICE
+        port-name: http
+
+eureka:
+  client:
+    enabled: ${EUREKA_CLIENT_ENABLED:true}
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+    metadata-map:
+      zone: ${AWS_AZ:local}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,circuitbreakers,ratelimiters,bulkheads
+  endpoint:
+    health:
+      probes:
+        enabled: true                       # /actuator/health/liveness and /readiness for Kubernetes
+      group:
+        readiness:
+          include: readinessState      # never couple readiness to shared deps (DB blip => fleet-wide outage)
+  health:
+    circuitbreakers:
+      enabled: true
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+  observations:
+    annotations:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+springdoc:
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
+
+logging:
+  pattern:
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-}] "
+  include-application-name: false

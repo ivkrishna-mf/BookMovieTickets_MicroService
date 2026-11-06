@@ -1,0 +1,175 @@
+# Local, production-like environment.  Start:  docker compose up -d --build
+# AWS equivalents: postgres -> Aurora PostgreSQL | redis -> ElastiCache | kafka -> MSK | keycloak -> Cognito
+#                  jaeger -> X-Ray (via ADOT) | prometheus/grafana -> Amazon Managed Prometheus/Grafana | eureka -> K8s API
+name: bmtickets
+
+x-service-env: &service-env
+  REDIS_HOST: redis
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  EUREKA_URL: http://discovery-server:8761/eureka
+  JWT_ISSUER_URI: http://localhost:8180/realms/bmtickets
+  JWT_JWK_SET_URI: http://keycloak:8080/realms/bmtickets/protocol/openid-connect/certs
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+  TRACING_SAMPLING_PROBABILITY: "1.0"
+  INTERNAL_AUTHORITY: ROLE_SERVICE
+  DB_USERNAME: bmtickets
+  DB_PASSWORD: bmtickets
+
+x-service: &service
+  restart: unless-stopped
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+    kafka: { condition: service_healthy }
+    keycloak: { condition: service_started }
+    discovery-server: { condition: service_started }
+
+services:
+  # ------------------------------------------------------------------ infrastructure
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: bmtickets
+      POSTGRES_PASSWORD: bmtickets
+      POSTGRES_DB: bmtickets
+    ports: ["5432:5432"]
+    volumes:
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bmtickets"]
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 20
+
+  kafka:
+    image: apache/kafka:3.9.1
+    ports: ["29092:29092"]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,HOST://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.1
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: http://localhost:8180          # token "iss" is always the browser-facing URL
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"     # containers can still call keycloak:8080
+      KC_HTTP_ENABLED: "true"
+    ports: ["8180:8080"]
+    volumes:
+      - ./docker/keycloak/bmtickets-realm.json:/opt/keycloak/data/import/bmtickets-realm.json:ro
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports: ["16686:16686", "4318:4318"]
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports: ["9090:9090"]
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports: ["3001:3000"]
+
+  # ------------------------------------------------------------------ platform services
+  discovery-server:
+    build: { context: ., dockerfile: docker/Dockerfile, args: { SERVICE: discovery-server } }
+    image: bmtickets/discovery-server:local
+    environment:
+      EUREKA_HOSTNAME: discovery-server
+    ports: ["8761:8761"]
+
+  api-gateway:
+    <<: *service
+    build: { context: ., dockerfile: docker/Dockerfile, args: { SERVICE: api-gateway } }
+    image: bmtickets/api-gateway:local
+    environment:
+      <<: *service-env
+      TRUSTED_PROXY_HOPS: "0"          # no ALB in front locally
+    ports: ["8080:8080"]
+
+  # ------------------------------------------------------------------ business services
+  catalog-service:
+    <<: *service
+    build: { context: ., dockerfile: docker/Dockerfile, args: { SERVICE: catalog-service } }
+    image: bmtickets/catalog-service:local
+    environment:
+      <<: *service-env
+      DB_URL: jdbc:postgresql://postgres:5432/catalog_db
+
+  seat-inventory-service:
+    <<: *service
+    build: { context: ., dockerfile: docker/Dockerfile, args: { SERVICE: seat-inventory-service } }
+    image: bmtickets/seat-inventory-service:local
+    environment:
+      <<: *service-env
+      DB_URL: jdbc:postgresql://postgres:5432/inventory_db
+
+  booking-service:
+    <<: *service
+    build: { context: ., dockerfile: docker/Dockerfile, args: { SERVICE: booking-service } }
+    image: bmtickets/booking-service:local
+    environment:
+      <<: *service-env
+      DB_URL: jdbc:postgresql://postgres:5432/booking_db
+      OAUTH_TOKEN_URI: http://keycloak:8080/realms/bmtickets/protocol/openid-connect/token
+      SERVICE_CLIENT_ID: booking-service
+      SERVICE_CLIENT_SECRET: booking-service-secret
+      TICKET_SIGNING_KEY: local-only-ticket-signing-key-do-not-reuse-0123456789
+
+  payment-service:
+    <<: *service
+    build: { context: ., dockerfile: docker/Dockerfile, args: { SERVICE: payment-service } }
+    image: bmtickets/payment-service:local
+    environment:
+      <<: *service-env
+      DB_URL: jdbc:postgresql://postgres:5432/payment_db
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-fake}       # set to "stripe" + keys to use Stripe test mode
+      STRIPE_API_KEY: ${STRIPE_API_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+
+  notification-service:
+    <<: *service
+    build: { context: ., dockerfile: docker/Dockerfile, args: { SERVICE: notification-service } }
+    image: bmtickets/notification-service:local
+    environment:
+      <<: *service-env
+      DB_URL: jdbc:postgresql://postgres:5432/notification_db
+      NOTIFICATION_CHANNEL: log
+
+volumes:
+  pgdata:

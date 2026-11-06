@@ -1,0 +1,139 @@
+# notification-service: Deployment + Service + KEDA ScaledObject (see keda-notification.yaml) + PDB
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  labels:
+    app.kubernetes.io/name: notification-service
+    app.kubernetes.io/part-of: bmtickets
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 0          # zero-downtime rolling deploys
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notification-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: notification-service
+        app.kubernetes.io/part-of: bmtickets
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8085"
+    spec:
+      serviceAccountName: notification-service
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:           # survive the loss of an AZ or a node
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: notification-service
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: notification-service
+      containers:
+        - name: notification-service
+          image: bmtickets/notification-service:latest      # replaced by kustomize "images" with the ECR URI + immutable tag
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8085
+          envFrom:
+            - configMapRef:
+                name: platform-config
+            - secretRef:
+                name: notification-service-secrets
+          env:
+            - name: SERVER_PORT
+              value: "8085"
+            - name: DB_URL
+              value: "jdbc:postgresql://$(DB_HOST):5432/notification_db?sslmode=require"
+            - name: NOTIFICATION_CHANNEL
+              value: "ses"
+            - name: SES_SEND_RATE
+              value: "14"
+            - name: NOTIFICATION_FROM
+              value: "tickets@bmtickets.example"
+            - name: SES_CONFIGURATION_SET
+              value: "bmtickets-transactional"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 640Mi
+            limits:
+              memory: 896Mi           # no CPU limit: avoids CFS throttling of the JVM; requests drive scheduling/HPA
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36             # up to 3 minutes for JVM start + Flyway
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "10"]   # let the ALB / kube-proxy deregister before graceful shutdown starts
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  labels:
+    app.kubernetes.io/name: notification-service
+spec:
+  selector:
+    app.kubernetes.io/name: notification-service
+  ports:
+    - name: http                 # port name "http" is what Spring Cloud Kubernetes LoadBalancer resolves
+      port: 8085
+      targetPort: http
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: notification-service
+spec:
+  maxUnavailable: 1                # node drains / upgrades never take out more than one pod
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notification-service

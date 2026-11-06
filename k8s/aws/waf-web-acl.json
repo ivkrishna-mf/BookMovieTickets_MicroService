@@ -1,0 +1,74 @@
+{
+  "Name": "bmtickets-edge",
+  "Scope": "REGIONAL",
+  "Description": "Edge protection in front of the ALB: per-IP rate limits (layer 1 of rate limiting), bot control, OWASP managed rules",
+  "DefaultAction": { "Allow": {} },
+  "VisibilityConfig": { "SampledRequestsEnabled": true, "CloudWatchMetricsEnabled": true, "MetricName": "bmtickets-edge" },
+  "Rules": [
+    {
+      "Name": "rate-limit-booking-per-ip",
+      "Priority": 0,
+      "Comment": "Max 100 booking requests per IP per 1 minute window",
+      "Action": { "Block": { "CustomResponse": { "ResponseCode": 429 } } },
+      "Statement": {
+        "RateBasedStatement": {
+          "Limit": 100,
+          "EvaluationWindowSec": 60,
+          "AggregateKeyType": "IP",
+          "ScopeDownStatement": {
+            "ByteMatchStatement": {
+              "SearchString": "/api/v1/bookings",
+              "FieldToMatch": { "UriPath": {} },
+              "TextTransformations": [{ "Priority": 0, "Type": "LOWERCASE" }],
+              "PositionalConstraint": "STARTS_WITH"
+            }
+          }
+        }
+      },
+      "VisibilityConfig": { "SampledRequestsEnabled": true, "CloudWatchMetricsEnabled": true, "MetricName": "rate-limit-booking" }
+    },
+    {
+      "Name": "rate-limit-global-per-ip",
+      "Priority": 1,
+      "Comment": "Max 2000 requests per IP per 5 minutes across the whole API (volumetric abuse / scraping)",
+      "Action": { "Block": { "CustomResponse": { "ResponseCode": 429 } } },
+      "Statement": { "RateBasedStatement": { "Limit": 2000, "EvaluationWindowSec": 300, "AggregateKeyType": "IP" } },
+      "VisibilityConfig": { "SampledRequestsEnabled": true, "CloudWatchMetricsEnabled": true, "MetricName": "rate-limit-global" }
+    },
+    {
+      "Name": "aws-managed-common",
+      "Priority": 2,
+      "OverrideAction": { "None": {} },
+      "Statement": { "ManagedRuleGroupStatement": { "VendorName": "AWS", "Name": "AWSManagedRulesCommonRuleSet" } },
+      "VisibilityConfig": { "SampledRequestsEnabled": true, "CloudWatchMetricsEnabled": true, "MetricName": "aws-common" }
+    },
+    {
+      "Name": "aws-managed-known-bad-inputs",
+      "Priority": 3,
+      "OverrideAction": { "None": {} },
+      "Statement": { "ManagedRuleGroupStatement": { "VendorName": "AWS", "Name": "AWSManagedRulesKnownBadInputsRuleSet" } },
+      "VisibilityConfig": { "SampledRequestsEnabled": true, "CloudWatchMetricsEnabled": true, "MetricName": "aws-bad-inputs" }
+    },
+    {
+      "Name": "aws-managed-ip-reputation",
+      "Priority": 4,
+      "OverrideAction": { "None": {} },
+      "Statement": { "ManagedRuleGroupStatement": { "VendorName": "AWS", "Name": "AWSManagedRulesAmazonIpReputationList" } },
+      "VisibilityConfig": { "SampledRequestsEnabled": true, "CloudWatchMetricsEnabled": true, "MetricName": "aws-ip-reputation" }
+    },
+    {
+      "Name": "aws-managed-bot-control",
+      "Priority": 5,
+      "Comment": "Scalper bots: challenge/block automated clients on booking endpoints",
+      "OverrideAction": { "None": {} },
+      "Statement": {
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesBotControlRuleSet",
+          "ManagedRuleGroupConfigs": [{ "AWSManagedRulesBotControlRuleSet": { "InspectionLevel": "COMMON" } }]
+        }
+      },
+      "VisibilityConfig": { "SampledRequestsEnabled": true, "CloudWatchMetricsEnabled": true, "MetricName": "aws-bot-control" }
+    }
+  ]
+}

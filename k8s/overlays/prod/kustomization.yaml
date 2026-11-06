@@ -1,0 +1,42 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+# Immutable ECR image tags (set by CI: kustomize edit set image ...)
+images:
+  - name: bmtickets/api-gateway
+    newName: <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/bmtickets/api-gateway
+    newTag: "1.0.0"
+  - name: bmtickets/catalog-service
+    newName: <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/bmtickets/catalog-service
+    newTag: "1.0.0"
+  - name: bmtickets/seat-inventory-service
+    newName: <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/bmtickets/seat-inventory-service
+    newTag: "1.0.0"
+  - name: bmtickets/booking-service
+    newName: <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/bmtickets/booking-service
+    newTag: "1.0.0"
+  - name: bmtickets/payment-service
+    newName: <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/bmtickets/payment-service
+    newTag: "1.0.0"
+  - name: bmtickets/notification-service
+    newName: <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/bmtickets/notification-service
+    newTag: "1.0.0"
+patches:
+  - target: { kind: ConfigMap, name: platform-config }
+    patch: |-
+      - op: replace
+        path: /data/JWT_ISSUER_URI
+        value: https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_XXXXXXXXX
+      - op: replace
+        path: /data/JWT_JWK_SET_URI
+        value: https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_XXXXXXXXX/.well-known/jwks.json
+      - op: replace
+        path: /data/OAUTH_TOKEN_URI
+        value: https://bmtickets-prod.auth.ap-south-1.amazoncognito.com/oauth2/token
+      - op: replace
+        path: /data/REDIS_HOST
+        value: clustercfg.bmtickets-prod.xxxxxx.aps1.cache.amazonaws.com
+      - op: replace
+        path: /data/KAFKA_BOOTSTRAP_SERVERS
+        value: b-1.bmtickets.xxxx.kafka.ap-south-1.amazonaws.com:9094,b-2.bmtickets.xxxx.kafka.ap-south-1.amazonaws.com:9094,b-3.bmtickets.xxxx.kafka.ap-south-1.amazonaws.com:9094

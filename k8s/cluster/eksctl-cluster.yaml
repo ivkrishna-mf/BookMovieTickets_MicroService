@@ -1,0 +1,92 @@
+# EKS cluster for BMTickets:  eksctl create cluster -f k8s/cluster/eksctl-cluster.yaml
+# 3 AZs, private worker nodes, Graviton (arm64) for ~20% better price/performance, IRSA roles per service.
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: bmtickets-prod
+  region: ap-south-1
+  version: "1.33"
+  tags:
+    project: bmtickets
+    environment: prod
+
+availabilityZones: ["ap-south-1a", "ap-south-1b", "ap-south-1c"]
+
+vpc:
+  cidr: 10.10.0.0/16
+  nat:
+    gateway: HighlyAvailable          # one NAT gateway per AZ: no cross-AZ single point of failure
+  clusterEndpoints:
+    privateAccess: true
+    publicAccess: true                # restrict publicAccessCIDRs to your CI / office ranges
+  publicAccessCIDRs: ["0.0.0.0/0"]
+
+secretsEncryption:
+  keyARN: arn:aws:kms:ap-south-1:<ACCOUNT_ID>:key/<KMS_KEY_ID>   # envelope-encrypt Kubernetes Secrets
+
+cloudWatch:
+  clusterLogging:
+    enableTypes: ["api", "audit", "authenticator"]
+
+iam:
+  withOIDC: true                      # IRSA: pods assume IAM roles, no node-wide credentials
+  serviceAccounts:
+    - metadata: { name: aws-load-balancer-controller, namespace: kube-system }
+      wellKnownPolicies: { awsLoadBalancerController: true }
+    - metadata: { name: external-secrets-reader, namespace: bmtickets }
+      roleName: bmtickets-external-secrets
+      attachPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"]
+            Resource: "arn:aws:secretsmanager:ap-south-1:<ACCOUNT_ID>:secret:bmtickets/*"
+    - metadata: { name: notification-service, namespace: bmtickets }
+      roleName: bmtickets-notification-ses
+      attachPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: ["ses:SendEmail", "ses:SendRawEmail"]
+            Resource: "arn:aws:ses:ap-south-1:<ACCOUNT_ID>:identity/bmtickets.example"
+    - metadata: { name: otel-collector, namespace: observability }
+      roleName: bmtickets-otel-collector
+      attachPolicyARNs:
+        - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonPrometheusRemoteWriteAccess
+    - metadata: { name: keda-operator, namespace: keda }
+      attachPolicyARNs:
+        - arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess
+
+addons:
+  - name: vpc-cni
+    configurationValues: '{"enableNetworkPolicy": "true"}'   # enforce Kubernetes NetworkPolicies
+  - name: coredns
+  - name: kube-proxy
+  - name: eks-pod-identity-agent
+  - name: aws-ebs-csi-driver
+  - name: metrics-server             # required by HPA
+  - name: amazon-cloudwatch-observability   # Container Insights + Fluent Bit -> CloudWatch Logs
+
+managedNodeGroups:
+  - name: system
+    instanceType: m7g.large
+    minSize: 3
+    maxSize: 6
+    desiredCapacity: 3
+    privateNetworking: true
+    labels: { workload: system }
+    volumeEncrypted: true
+  - name: apps
+    instanceTypes: ["m7g.xlarge", "m7g.2xlarge"]
+    minSize: 3
+    maxSize: 60
+    desiredCapacity: 6
+    privateNetworking: true
+    labels: { workload: apps }
+    volumeEncrypted: true
+    iam:
+      withAddonPolicies:
+        autoScaler: true
+# For faster, bin-packed node scaling during on-sales, Karpenter is recommended instead of the Cluster Autoscaler.

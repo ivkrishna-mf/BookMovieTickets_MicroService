@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package bmtickets.inventory.v1;
+
+option java_multiple_files = true;
+option java_package = "com.bmtickets.grpc.inventory.v1";
+option java_outer_classname = "InventoryProto";
+
+// Seat reservation commands used by the booking saga orchestrator.
+// All operations are idempotent on hold_ref (= booking id) so they are safe to retry.
+service SeatInventoryService {
+  rpc HoldSeats(HoldSeatsRequest) returns (HoldSeatsResponse);
+  rpc ConfirmSeats(HoldRefRequest) returns (SeatOperationResponse);
+  rpc ReleaseSeats(HoldRefRequest) returns (SeatOperationResponse);
+}
+
+message HoldSeatsRequest {
+  string show_id = 1;
+  repeated string seat_numbers = 2;
+  string hold_ref = 3;
+  int32 hold_ttl_seconds = 4;
+}
+
+message HeldSeat {
+  string seat_number = 1;
+  string category = 2;
+}
+
+message HoldSeatsResponse {
+  bool success = 1;
+  repeated HeldSeat seats = 2;
+  repeated string unavailable_seats = 3;
+  string failure_reason = 4;             // SEATS_UNAVAILABLE | UNKNOWN_SEATS | THROTTLED
+  int64 hold_expires_at_epoch_ms = 5;
+}
+
+message HoldRefRequest {
+  string hold_ref = 1;
+}
+
+message SeatOperationResponse {
+  bool success = 1;
+  int32 affected = 2;
+  string failure_reason = 3;
+}

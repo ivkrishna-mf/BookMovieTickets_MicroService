@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: payment-service
+  config:
+    import: classpath:bmtickets-defaults.yml
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/payment_db}
+    username: ${DB_USERNAME:bmtickets}
+    password: ${DB_PASSWORD:bmtickets}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI:http://localhost:8180/realms/bmtickets}
+          jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8180/realms/bmtickets/protocol/openid-connect/certs}
+
+server:
+  port: ${SERVER_PORT:8084}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      stripe:
+        sliding-window-size: 50
+        minimum-number-of-calls: 20
+        failure-rate-threshold: 50
+        slow-call-duration-threshold: 5s
+        wait-duration-in-open-state: 20s
+        permitted-number-of-calls-in-half-open-state: 5
+        record-exceptions:
+          - com.bmtickets.payment.gateway.ProviderUnavailableException
+        ignore-exceptions:
+          - com.bmtickets.common.error.BusinessException
+
+app:
+  outbox:
+    enabled: true
+  kafka:
+    partitions: ${KAFKA_PARTITIONS:12}
+    replicas: ${KAFKA_REPLICAS:1}
+  payment:
+    provider: ${PAYMENT_PROVIDER:fake}         # stripe | fake
+  stripe:
+    api-key: ${STRIPE_API_KEY:}
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
+    rate-per-second: ${STRIPE_RATE_PER_SEC:80}
+    burst: ${STRIPE_BURST:100}
+  security:
+    internal-authority: ${INTERNAL_AUTHORITY:SCOPE_internal}
+    public-paths:
+      - /api/v1/payments/webhooks/**

@@ -1,0 +1,33 @@
+# Twelve-factor config: non-secret, environment-specific settings shared by all services (injected via envFrom).
+# Placeholders <...> are filled per environment by the overlays.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-config
+data:
+  AWS_REGION: ap-south-1
+  # --- identity: Amazon Cognito user pool ---
+  JWT_ISSUER_URI: https://cognito-idp.ap-south-1.amazonaws.com/<USER_POOL_ID>
+  JWT_JWK_SET_URI: https://cognito-idp.ap-south-1.amazonaws.com/<USER_POOL_ID>/.well-known/jwks.json
+  OAUTH_TOKEN_URI: https://<COGNITO_DOMAIN>.auth.ap-south-1.amazoncognito.com/oauth2/token
+  INTERNAL_AUTHORITY: SCOPE_bmtickets/internal
+  # --- data stores ---
+  REDIS_HOST: <ELASTICACHE_CONFIGURATION_ENDPOINT>
+  REDIS_PORT: "6379"
+  REDIS_SSL: "true"
+  KAFKA_BOOTSTRAP_SERVERS: <MSK_BOOTSTRAP_BROKERS_TLS>
+  KAFKA_SECURITY_PROTOCOL: SSL
+  KAFKA_REPLICAS: "3"
+  KAFKA_PARTITIONS: "24"
+  DB_POOL_SIZE: "20"
+  # --- discovery: Kubernetes API instead of Eureka ---
+  EUREKA_CLIENT_ENABLED: "false"
+  K8S_LB_MODE: SERVICE
+  SPRING_CLOUD_KUBERNETES_LOADBALANCER_MODE: SERVICE
+  SPRING_CLOUD_KUBERNETES_DISCOVERY_ENABLED: "true"
+  # --- observability ---
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.observability.svc.cluster.local:4318/v1/traces
+  TRACING_SAMPLING_PROBABILITY: "0.05"
+  LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs        # JSON logs (with traceId/spanId) -> Fluent Bit -> CloudWatch Logs
+  SWAGGER_ENABLED: "false"
+  GRPC_NEGOTIATION: plaintext                   # in-cluster; enable mTLS via service mesh if required

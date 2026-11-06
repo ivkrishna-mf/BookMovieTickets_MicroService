@@ -1,0 +1,85 @@
+# Zero-trust networking inside the namespace (requires VPC CNI network policy support:
+# vpc-cni addon configurationValues {"enableNetworkPolicy": "true"}).
+# 1) deny all ingress by default
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+---
+# 2) the ALB (target-type ip, inside the VPC) may reach only the gateway
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alb-to-gateway
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: api-gateway }
+  ingress:
+    - from:
+        - ipBlock: { cidr: 10.10.0.0/16 }          # VPC CIDR (ALB subnets)
+      ports:
+        - { port: 8080, protocol: TCP }
+---
+# 3) gateway -> public-facing services (REST)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-services
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [catalog-service, seat-inventory-service, booking-service, payment-service]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: api-gateway }
+      ports:
+        - { port: 8081, protocol: TCP }
+        - { port: 8082, protocol: TCP }
+        - { port: 8083, protocol: TCP }
+        - { port: 8084, protocol: TCP }
+---
+# 4) booking-service (saga orchestrator) -> gRPC catalog/inventory and REST /internal on payment
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-booking-to-dependencies
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [catalog-service, seat-inventory-service, payment-service]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: booking-service }
+      ports:
+        - { port: 9091, protocol: TCP }
+        - { port: 9092, protocol: TCP }
+        - { port: 8084, protocol: TCP }
+---
+# 5) observability: the OTel collector scrapes /actuator/prometheus on every service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-metrics-scraping
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/part-of: bmtickets }
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: observability }
+      ports:
+        - { port: 8080, protocol: TCP }
+        - { port: 8081, protocol: TCP }
+        - { port: 8082, protocol: TCP }
+        - { port: 8083, protocol: TCP }
+        - { port: 8084, protocol: TCP }
+        - { port: 8085, protocol: TCP }

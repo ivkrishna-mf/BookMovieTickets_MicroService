@@ -1,0 +1,39 @@
+# Event-driven autoscaling: notification-service scales on Kafka consumer lag (not CPU), so a burst of
+# confirmations after a big on-sale is drained quickly and the pods scale back down afterwards.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: keda-kafka-tls
+type: Opaque
+stringData:
+  tls: enable
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: kafka-tls
+spec:
+  secretTargetRef:
+    - parameter: tls
+      name: keda-kafka-tls
+      key: tls
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: notification-service
+spec:
+  scaleTargetRef:
+    name: notification-service
+  minReplicaCount: 2
+  maxReplicaCount: 24              # <= partition count; more consumers than partitions would sit idle
+  cooldownPeriod: 300
+  triggers:
+    - type: kafka
+      authenticationRef:
+        name: kafka-tls
+      metadata:
+        bootstrapServers: <MSK_BOOTSTRAP_BROKERS_TLS>
+        consumerGroup: notification-service
+        topic: booking.events
+        lagThreshold: "200"

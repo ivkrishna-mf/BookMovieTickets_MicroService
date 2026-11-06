@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: seat-inventory-service
+  config:
+    import: classpath:bmtickets-defaults.yml
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/inventory_db}
+    username: ${DB_USERNAME:bmtickets}
+    password: ${DB_PASSWORD:bmtickets}
+    hikari:
+      # never wait forever on a row lock: contended holds fail fast instead of piling up connections
+      connection-init-sql: SET lock_timeout = '3s'
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI:http://localhost:8180/realms/bmtickets}
+          jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8180/realms/bmtickets/protocol/openid-connect/certs}
+
+server:
+  port: ${SERVER_PORT:8082}
+
+grpc:
+  server:
+    port: ${GRPC_PORT:9092}
+    keep-alive-time: 30s
+    permit-keep-alive-time: 10s
+    permit-keep-alive-without-calls: true
+
+app:
+  grpc:
+    auth-enabled: ${GRPC_AUTH_ENABLED:true}
+  inventory:
+    max-hold-ttl: ${MAX_HOLD_TTL:PT15M}
+    show-hold-burst: ${SHOW_HOLD_BURST:300}
+    show-hold-rate-per-sec: ${SHOW_HOLD_RATE:150}
+    seat-map-cache-ttl: PT2S
+  security:
+    internal-authority: ${INTERNAL_AUTHORITY:SCOPE_internal}
+    public-get-paths:
+      - /api/v1/shows/*/seats

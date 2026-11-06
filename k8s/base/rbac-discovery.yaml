@@ -1,0 +1,29 @@
+# Spring Cloud Kubernetes uses the Kubernetes API as the service registry (replaces Eureka on EKS).
+# Read-only access to Services/Endpoints in this namespace only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: service-discovery-reader
+rules:
+  - apiGroups: [""]
+    resources: ["services", "endpoints", "pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: service-discovery-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: service-discovery-reader
+subjects:
+  - { kind: ServiceAccount, name: api-gateway }
+  - { kind: ServiceAccount, name: catalog-service }
+  - { kind: ServiceAccount, name: seat-inventory-service }
+  - { kind: ServiceAccount, name: booking-service }
+  - { kind: ServiceAccount, name: payment-service }
+  - { kind: ServiceAccount, name: notification-service }

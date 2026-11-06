@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: notification-service
+  config:
+    import: classpath:bmtickets-defaults.yml
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/notification_db}
+    username: ${DB_USERNAME:bmtickets}
+    password: ${DB_PASSWORD:bmtickets}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI:http://localhost:8180/realms/bmtickets}
+          jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8180/realms/bmtickets/protocol/openid-connect/certs}
+
+server:
+  port: ${SERVER_PORT:8085}
+
+app:
+  kafka:
+    partitions: ${KAFKA_PARTITIONS:12}
+    replicas: ${KAFKA_REPLICAS:1}
+    listener-concurrency: ${KAFKA_LISTENER_CONCURRENCY:3}
+  notification:
+    channel: ${NOTIFICATION_CHANNEL:log}          # ses | log
+    aws-region: ${AWS_REGION:ap-south-1}
+    from-address: ${NOTIFICATION_FROM:tickets@bmtickets.example}
+    ses-configuration-set: ${SES_CONFIGURATION_SET:}
+    send-rate-per-sec: ${SES_SEND_RATE:14}

@@ -1,0 +1,94 @@
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+spring:
+  application:
+    name: api-gateway
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      ssl:
+        enabled: ${REDIS_SSL:false}          # ElastiCache in-transit encryption => true
+      timeout: 500ms
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI:http://localhost:8180/realms/bmtickets}
+          jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8180/realms/bmtickets/protocol/openid-connect/certs}
+  cloud:
+    kubernetes:
+      # Spring Cloud Kubernetes activates only when running inside Kubernetes.
+      config:
+        enabled: false        # configuration comes from env (ConfigMap/Secret via envFrom), not the K8s API
+      secrets:
+        enabled: false
+      loadbalancer:
+        mode: ${K8S_LB_MODE:SERVICE}   # resolve lb://name to the K8s Service (kube-proxy / IPVS balances pods)
+        port-name: http
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+  rate-limit:
+    trusted-proxy-hops: ${TRUSTED_PROXY_HOPS:1}
+    max-in-flight-requests: ${MAX_INFLIGHT_REQUESTS:2000}
+    standard:
+      replenish-rate: ${RL_STANDARD_RATE:20}
+      burst-capacity: ${RL_STANDARD_BURST:40}
+      requested-tokens: 1
+    booking:
+      replenish-rate: ${RL_BOOKING_RATE:2}
+      burst-capacity: ${RL_BOOKING_BURST:5}
+      requested-tokens: 1
+    catalog:
+      replenish-rate: ${RL_CATALOG_RATE:50}
+      burst-capacity: ${RL_CATALOG_BURST:100}
+      requested-tokens: 1
+    webhook:
+      replenish-rate: ${RL_WEBHOOK_RATE:100}
+      burst-capacity: ${RL_WEBHOOK_BURST:200}
+      requested-tokens: 1
+
+eureka:
+  client:
+    enabled: ${EUREKA_CLIENT_ENABLED:true}
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    redis:
+      enabled: false       # Redis outage must not take the gateway out of rotation (limiter fails open)
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        spring.cloud.gateway.requests: true
+
+logging:
+  level:
+    org.springframework.cloud.gateway.filter.ratelimit: INFO
