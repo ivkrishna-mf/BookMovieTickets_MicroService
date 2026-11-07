@@ -3,6 +3,7 @@ package com.bmtickets.gateway.config;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cloud.gateway.filter.ratelimit.KeyResolver;
 import org.springframework.cloud.gateway.filter.ratelimit.RedisRateLimiter;
+import org.springframework.cloud.gateway.filter.factory.RequestSizeGatewayFilterFactory;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
@@ -26,7 +27,8 @@ public class RoutesConfig {
                         @Qualifier("standardRateLimiter") RedisRateLimiter standard,
                         @Qualifier("bookingRateLimiter") RedisRateLimiter booking,
                         @Qualifier("catalogRateLimiter") RedisRateLimiter catalog,
-                        @Qualifier("webhookRateLimiter") RedisRateLimiter webhook) {
+                        @Qualifier("webhookRateLimiter") RedisRateLimiter webhook,
+                        RequestSizeGatewayFilterFactory requestSizeFilterFactory) {
         return builder.routes()
                 // ---- read-heavy, public, cacheable ----
                 .route("catalog", r -> r.path("/api/v1/catalog/**")
@@ -47,7 +49,9 @@ public class RoutesConfig {
                 .route("bookings", r -> r.path("/api/v1/bookings/**")
                         .filters(f -> f
                                 .requestRateLimiter(c -> c.setRateLimiter(booking).setKeyResolver(userKey))
-                                .requestSize(DataSize.ofKilobytes(16))
+                                .filter(requestSizeFilterFactory.apply(
+                                        new RequestSizeGatewayFilterFactory.RequestSizeConfig()
+                                                .setMaxSize(DataSize.ofKilobytes(16))))
                                 .circuitBreaker(c -> c.setName("booking").setFallbackUri("forward:/fallback/booking")))
                         .uri("lb://booking-service"))
 
@@ -55,7 +59,9 @@ public class RoutesConfig {
                 .route("payment-webhooks", r -> r.path("/api/v1/payments/webhooks/**")
                         .filters(f -> f
                                 .requestRateLimiter(c -> c.setRateLimiter(webhook).setKeyResolver(ipKey))
-                                .requestSize(DataSize.ofKilobytes(256)))
+                                .filter(requestSizeFilterFactory.apply(
+                                        new RequestSizeGatewayFilterFactory.RequestSizeConfig()
+                                                .setMaxSize(DataSize.ofKilobytes(256)))))
                         .uri("lb://payment-service"))
 
                 .route("payments", r -> r.path("/api/v1/payments/**")

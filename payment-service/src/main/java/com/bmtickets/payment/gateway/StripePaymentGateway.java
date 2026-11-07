@@ -3,7 +3,7 @@ package com.bmtickets.payment.gateway;
 import com.bmtickets.common.ratelimit.BucketSpec;
 import com.bmtickets.common.ratelimit.DistributedRateLimiter;
 import com.bmtickets.payment.config.StripeProperties;
-import com.stripe.exception.APIConnectionException;
+import com.stripe.exception.ApiConnectionException;
 import com.stripe.exception.ApiException;
 import com.stripe.exception.EventDataObjectDeserializationException;
 import com.stripe.exception.InvalidRequestException;
@@ -168,7 +168,7 @@ public class StripePaymentGateway implements PaymentGateway {
         }
         try {
             return fn.execute();
-        } catch (RateLimitException | APIConnectionException | ApiException e) {   // RateLimitException first: it extends InvalidRequestException
+        } catch (RateLimitException | ApiConnectionException | ApiException e) {   // RateLimitException first: it extends InvalidRequestException
             throw new ProviderUnavailableException("Stripe temporarily unavailable: " + e.getMessage(), e);
         } catch (InvalidRequestException e) {
             throw new ProviderRejectedException(e.getMessage());

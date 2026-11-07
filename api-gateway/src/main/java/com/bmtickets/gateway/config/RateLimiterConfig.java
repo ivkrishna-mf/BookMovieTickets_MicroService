@@ -2,6 +2,7 @@ package com.bmtickets.gateway.config;
 
 import org.springframework.cloud.gateway.filter.ratelimit.KeyResolver;
 import org.springframework.cloud.gateway.filter.ratelimit.RedisRateLimiter;
+import org.springframework.cloud.gateway.support.ipresolver.RemoteAddressResolver;
 import org.springframework.cloud.gateway.support.ipresolver.XForwardedRemoteAddressResolver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,7 +23,7 @@ public class RateLimiterConfig {
     /** Authenticated callers are limited per user (JWT sub); falls back to client IP for anonymous calls. */
     @Bean
     @Primary
-    KeyResolver userKeyResolver(XForwardedRemoteAddressResolver remoteAddressResolver) {
+    KeyResolver userKeyResolver(RemoteAddressResolver remoteAddressResolver) {
         return exchange -> exchange.getPrincipal()
                 .map(Principal::getName)
                 .map(sub -> "user:" + sub)
@@ -30,17 +31,29 @@ public class RateLimiterConfig {
     }
 
     @Bean
-    KeyResolver ipKeyResolver(XForwardedRemoteAddressResolver remoteAddressResolver) {
+    KeyResolver ipKeyResolver(RemoteAddressResolver remoteAddressResolver) {
         return exchange -> Mono.just("ip:" + clientIp(exchange, remoteAddressResolver));
     }
 
     /**
      * Only trust the X-Forwarded-For entries appended by our own proxies (ALB), never the left-most
-     * client-supplied value, otherwise attackers could rotate fake IPs to bypass per-IP limits.
+     * client-supplied value. With no trusted proxy, use the socket peer address.
      */
     @Bean
-    XForwardedRemoteAddressResolver remoteAddressResolver(RateLimitProperties props) {
-        return XForwardedRemoteAddressResolver.maxTrustedIndex(props.trustedProxyHops());
+    RemoteAddressResolver remoteAddressResolver(RateLimitProperties props) {
+        int trustedProxyHops = props.trustedProxyHops();
+        if (trustedProxyHops < 0) {
+            throw new IllegalArgumentException("trustedProxyHops must not be negative");
+        }
+        if (trustedProxyHops == 0) {
+            return new RemoteAddressResolver() {
+                @Override
+                public InetSocketAddress resolve(ServerWebExchange exchange) {
+                    return exchange.getRequest().getRemoteAddress();
+                }
+            };
+        }
+        return XForwardedRemoteAddressResolver.maxTrustedIndex(trustedProxyHops);
     }
 
     @Bean
@@ -68,7 +81,7 @@ public class RateLimiterConfig {
         return new RedisRateLimiter(b.replenishRate(), b.burstCapacity(), b.requestedTokens());
     }
 
-    private static String clientIp(ServerWebExchange exchange, XForwardedRemoteAddressResolver resolver) {
+    private static String clientIp(ServerWebExchange exchange, RemoteAddressResolver resolver) {
         InetSocketAddress address = resolver.resolve(exchange);
         if (address == null) {
             return "unknown";

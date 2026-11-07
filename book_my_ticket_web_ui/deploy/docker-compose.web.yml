@@ -1,0 +1,21 @@
+# Adds the web UI to the platform's local stack. Run from the repository root:
+#   docker compose -f docker-compose.yml -f book_my_ticket_web_ui/deploy/docker-compose.web.yml up -d --build
+# Relative paths resolve against the repository root (the first compose file's directory).
+services:
+  web-ui:
+    build:
+      context: ./book_my_ticket_web_ui
+      args:
+        SKIP_TESTS: "false"
+    image: bmtickets/web-ui:local
+    restart: unless-stopped
+    environment:
+      API_UPSTREAM: http://api-gateway:8080          # nginx proxies /api -> gateway (same origin, no CORS)
+      BMT_AUTH_URL: http://localhost:8180/realms/bmtickets
+      CSP_CONNECT_SRC: "http://localhost:8180 https://api.stripe.com"
+      BMT_PAYMENT_MODE: ${PAYMENT_PROVIDER:-fake}
+      BMT_STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+    # Host port 3000: the Keycloak "bmtickets-web" client and gateway CORS allow http://localhost:3000.
+    ports: ["3000:8080"]
+    depends_on:
+      api-gateway: { condition: service_started }

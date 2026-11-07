@@ -1,0 +1,164 @@
+# BMTickets web UI on EKS: stateless nginx pods serving the SPA. Same namespace as the platform services.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-ui-config
+data:
+  # '' = same origin: the ALB routes https://www.<domain>/api/* straight to api-gateway (see ingress below).
+  BMT_API_BASE_URL: ""
+  # Cognito user pool issuer (OIDC discovery is served from here).
+  BMT_AUTH_URL: https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_XXXXXXXXX
+  BMT_CLIENT_ID: <COGNITO_WEB_APP_CLIENT_ID>
+  BMT_PAYMENT_MODE: stripe
+  BMT_STRIPE_PUBLISHABLE_KEY: pk_live_XXXXXXXXXXXX          # publishable key: safe to expose to browsers
+  BMT_DEFAULT_CITY: Mumbai
+  BMT_CITIES: Mumbai,Delhi,Bengaluru,Hyderabad,Chennai,Pune,Kolkata
+  CSP_CONNECT_SRC: https://cognito-idp.ap-south-1.amazonaws.com https://bmtickets-prod.auth.ap-south-1.amazoncognito.com https://api.stripe.com
+  # Only used if something calls /api on the web pods directly (normally the ALB sends /api to the gateway).
+  API_UPSTREAM: http://api-gateway.bmtickets.svc.cluster.local:8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-ui
+  labels:
+    app.kubernetes.io/name: web-ui
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web-ui
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: web-ui
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app.kubernetes.io/name: web-ui }
+      containers:
+        - name: web-ui
+          image: bmtickets/web-ui
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 8080 }
+          envFrom:
+            - configMapRef: { name: web-ui-config }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 128Mi }
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 15
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec: { command: ["sleep", "10"] }   # let the ALB deregister the target before nginx stops
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }                      # pid, temp files, generated config.js
+            - { name: nginx-conf, mountPath: /etc/nginx/conf.d }  # rendered from /etc/nginx/templates at start
+      volumes:
+        - name: tmp
+          emptyDir: { medium: Memory, sizeLimit: 16Mi }
+        - name: nginx-conf
+          emptyDir: { sizeLimit: 1Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-ui
+  labels:
+    app.kubernetes.io/name: web-ui
+spec:
+  selector:
+    app.kubernetes.io/name: web-ui
+  ports:
+    - { name: http, port: 8080, targetPort: http }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: web-ui
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: web-ui }
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: web-ui
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: web-ui }
+---
+# The platform namespace denies all ingress by default; allow the ALB (VPC CIDR) to reach the web pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alb-to-web-ui
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: web-ui }
+  ingress:
+    - from:
+        - ipBlock: { cidr: 10.10.0.0/16 }          # VPC CIDR (ALB subnets) - keep in sync with k8s/base
+      ports:
+        - { port: 8080, protocol: TCP }
+---
+# One origin for the browser: www.<domain>/api/* -> api-gateway, everything else -> web-ui.
+# Shares the platform ALB through the ingress group (same WAF, TLS policy, access logs).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bmtickets-web
+  annotations:
+    alb.ingress.kubernetes.io/group.name: bmtickets
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:<ACCOUNT_ID>:certificate/<CERT_ID>
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+    alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:ap-south-1:<ACCOUNT_ID>:regional/webacl/bmtickets-edge/<ACL_ID>
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+spec:
+  ingressClassName: alb
+  rules:
+    - host: www.bmtickets.example
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service: { name: api-gateway, port: { name: http } }
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: web-ui, port: { name: http } }

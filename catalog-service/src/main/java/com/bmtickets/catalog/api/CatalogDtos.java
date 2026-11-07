@@ -36,7 +36,7 @@ public final class CatalogDtos {
             @NotBlank @Pattern(regexp = "[A-Z]{3}") String currency,
             @Min(1) @Max(20) int maxSeatsPerBooking,
             @NotEmpty Map<String, BigDecimal> priceByCategory,
-            @NotEmpty List<@Valid ShowScheduledEvent.SeatSection> sections) {
+            @NotEmpty List<ShowScheduledEvent.@Valid SeatSection> sections) {
     }
 
     public record IdResponse(UUID id) {

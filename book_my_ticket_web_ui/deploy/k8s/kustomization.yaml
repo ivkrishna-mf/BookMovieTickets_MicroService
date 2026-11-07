@@ -1,0 +1,16 @@
+# kubectl apply -k book_my_ticket_web_ui/deploy/k8s
+# CI pins the immutable image:  kustomize edit set image bmtickets/web-ui=<ACCOUNT_ID>.dkr.ecr.<region>.amazonaws.com/bmtickets/web-ui:<git-sha>
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: bmtickets
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: bmtickets
+      app.kubernetes.io/component: frontend
+    includeSelectors: false
+resources:
+  - web-ui.yaml
+images:
+  - name: bmtickets/web-ui
+    newName: <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/bmtickets/web-ui
+    newTag: "1.0.0"

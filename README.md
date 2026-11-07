@@ -48,6 +48,14 @@ docker compose ps                     # wait until services are up (~1-2 min fir
 | http://localhost:16686 | Jaeger traces |
 | http://localhost:9090 / :3001 | Prometheus / Grafana |
 
+Grafana provisions the **BMTickets - Local Service Health** dashboard automatically. It includes
+request throughput and latency, response failures by service/status, top failing paths, circuit
+breaker and database-pool signals, JVM heap/non-heap/CPU/threads/GC, and disk usage.
+Select a time range, reproduce a failing request, and use Jaeger at `http://localhost:16686` to
+inspect its distributed trace. Prometheus scrapes the gateway, discovery server, and business
+services every 15 seconds; short-window rates may take a minute to become useful. CPU, JVM memory,
+and disk panels are metrics from those Java services, not Windows host-wide metrics.
+
 Get a token manually:
 ```bash
 curl -s -X POST http://localhost:8180/realms/bmtickets/protocol/openid-connect/token \
