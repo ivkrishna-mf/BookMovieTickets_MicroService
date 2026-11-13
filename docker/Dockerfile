@@ -34,7 +34,7 @@ RUN --mount=type=cache,target=/root/.m2 \
 FROM eclipse-temurin:${JAVA_VERSION}-jre-noble AS runtime
 ARG SERVICE
 LABEL org.opencontainers.image.title="bmtickets-${SERVICE}" \
-      org.opencontainers.image.vendor="BMTickets" \
+      org.opencontainers.image.vendor="BookMyTickets" \
       org.opencontainers.image.source="https://github.com/your-org/ticket-booking-platform"
 
 RUN groupadd --system --gid 10001 app && useradd --system --uid 10001 --gid app --no-create-home app

@@ -11,7 +11,7 @@ export function RequireAuth({ children, role }: { children: ReactNode; role?: st
   if (!user) {
     return (
       <EmptyState title="Sign in to continue" icon={<Lock size={40} aria-hidden />}>
-        <p>Your bookings and tickets are tied to your BMTickets account.</p>
+        <p>Your bookings and tickets are tied to your BookMyTickets account.</p>
         <button className="btn btn--primary" onClick={() => void login(location.pathname + location.search)}>
           <LogIn size={16} aria-hidden /> Sign in
         </button>

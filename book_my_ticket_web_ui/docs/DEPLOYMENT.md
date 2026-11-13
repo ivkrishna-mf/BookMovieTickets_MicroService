@@ -1,6 +1,6 @@
-# Deploying the BMTickets Web UI
+# Deploying the BookMyTickets Web UI
 
-This guide covers deploying the web UI next to the BMTickets platform on **Amazon EKS** (the recommended path), and an alternative on **S3 + CloudFront**. It assumes the backend is already deployed as described in [k8s/README.md](../../k8s/README.md). That means the namespace `bmtickets`, the `api-gateway` Service, the AWS Load Balancer Controller, Cognito and WAF all exist.
+This guide covers deploying the web UI next to the BookMyTickets platform on **Amazon EKS** (the recommended path), and an alternative on **S3 + CloudFront**. It assumes the backend is already deployed as described in [k8s/README.md](../../k8s/README.md). That means the namespace `bmtickets`, the `api-gateway` Service, the AWS Load Balancer Controller, Cognito and WAF all exist.
 
 ## Contents
 
@@ -189,7 +189,7 @@ Then in a browser: sign in, open a show, hold seats, pay with a Stripe test card
 How a Stripe payment completes:
 
 1. The UI mounts Stripe's Payment Element using the booking's `paymentClientSecret`.
-2. `stripe.confirmPayment` sends the card details directly to Stripe. They never reach BMTickets servers (PCI SAQ-A scope).
+2. `stripe.confirmPayment` sends the card details directly to Stripe. They never reach BookMyTickets servers (PCI SAQ-A scope).
 3. Stripe's webhook goes to `payment-service`, which advances the booking saga to `CONFIRMED`.
 4. The UI polls `GET /api/v1/bookings/{id}` until it sees `CONFIRMED`.
 

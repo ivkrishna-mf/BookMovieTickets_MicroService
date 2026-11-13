@@ -1,4 +1,4 @@
-# EKS cluster for BMTickets:  eksctl create cluster -f k8s/cluster/eksctl-cluster.yaml
+# EKS cluster for BookMyTickets:  eksctl create cluster -f k8s/cluster/eksctl-cluster.yaml
 # 3 AZs, private worker nodes, Graviton (arm64) for ~20% better price/performance, IRSA roles per service.
 apiVersion: eksctl.io/v1alpha5
 kind: ClusterConfig

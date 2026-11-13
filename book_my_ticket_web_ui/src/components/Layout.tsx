@@ -66,7 +66,7 @@ export function Layout() {
       <AnimatedBackground />
       <a className="skip-link" href="#main">Skip to content</a>
       <header className="topbar">
-        <NavLink to="/" className="brand" aria-label="BMTickets home">
+        <NavLink to="/" className="brand" aria-label="BookMyTickets home">
           <motion.span
             className="brand__logo"
             animate={{ rotateY: [0, 360] }}
@@ -75,7 +75,7 @@ export function Layout() {
           >
             🎟️
           </motion.span>
-          <span className="brand__name">BM<span>Tickets</span></span>
+          <span className="brand__name">BookMy<span>Tickets</span></span>
         </NavLink>
 
         <nav className="tabs" aria-label="Primary">
@@ -123,7 +123,7 @@ export function Layout() {
       </nav>
 
       <footer className="footer">
-        <span>© {new Date().getFullYear()} BMTickets</span>
+        <span>© {new Date().getFullYear()} BookMyTickets</span>
         <span>No double-booked seats. No double charges.</span>
       </footer>
     </div>

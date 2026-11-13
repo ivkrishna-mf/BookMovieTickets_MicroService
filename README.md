@@ -1,4 +1,4 @@
-# BMTickets - Ticket Booking Platform (Java microservices on AWS EKS)
+# BookMyTickets - Ticket Booking Platform (Java microservices on AWS EKS)
 
 Production-grade, event-driven ticket booking backend (movies, concerts, sports) designed for millions of users:
 **no double-booked seats, no double charges, idempotent end to end, rate-limited and throttled at every layer.**
@@ -48,7 +48,7 @@ docker compose ps                     # wait until services are up (~1-2 min fir
 | http://localhost:16686 | Jaeger traces |
 | http://localhost:9090 / :3001 | Prometheus / Grafana |
 
-Grafana provisions the **BMTickets - Local Service Health** dashboard automatically. It includes
+Grafana provisions the **BookMyTickets - Local Service Health** dashboard automatically. It includes
 request throughput and latency, response failures by service/status, top failing paths, circuit
 breaker and database-pool signals, JVM heap/non-heap/CPU/threads/GC, and disk usage.
 Select a time range, reproduce a failing request, and use Jaeger at `http://localhost:16686` to

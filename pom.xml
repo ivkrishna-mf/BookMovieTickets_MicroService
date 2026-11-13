@@ -15,7 +15,7 @@
     <artifactId>ticket-booking-platform</artifactId>
     <version>1.0.0</version>
     <packaging>pom</packaging>
-    <name>BMTickets - Ticket Booking Platform</name>
+    <name>BookMyTickets - Ticket Booking Platform</name>
 
     <modules>
         <module>common-lib</module>

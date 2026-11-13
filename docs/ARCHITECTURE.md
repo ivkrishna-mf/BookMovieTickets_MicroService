@@ -1,4 +1,4 @@
-# BMTickets - Architecture & Design Decisions
+# BookMyTickets - Architecture & Design Decisions
 
 > Enterprise ticket-booking platform (movies, concerts, sports) built as Java 21 / Spring Boot 3.5 microservices,
 > packaged as Docker images in Amazon ECR and run on Amazon EKS.
@@ -249,7 +249,7 @@ because "hold again by the same booking" and "confirm an already-booked seat by 
 
 **Rate limiting** caps how many requests a *key* (IP, user, show, external API) may make per unit of time and
 **rejects** the excess (HTTP 429). **Throttling** controls *how fast/how much* work proceeds - by **delaying**
-(smoothing) or bounding **concurrency** - so a component is never driven past its capacity. BMTickets applies
+(smoothing) or bounding **concurrency** - so a component is never driven past its capacity. BookMyTickets applies
 both at every layer, each one sized for what it protects:
 
 ```mermaid

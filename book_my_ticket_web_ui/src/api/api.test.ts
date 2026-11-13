@@ -60,7 +60,7 @@ describe('apiRequest', () => {
     const error = (await catalogApi.event('x').catch((e: unknown) => e)) as ApiError;
     expect(error.status).toBe(0);
     expect(error.code).toBe('NETWORK_ERROR');
-    expect(describeError(error)).toMatch(/Cannot reach BMTickets/);
+    expect(describeError(error)).toMatch(/Cannot reach BookMyTickets/);
   });
 
   it('attaches the bearer token and Idempotency-Key for authenticated writes', async () => {

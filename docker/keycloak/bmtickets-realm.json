@@ -20,7 +20,7 @@
   "clients": [
     {
       "clientId": "bmtickets-web",
-      "name": "BMTickets Web (SPA)",
+      "name": "BookMyTickets Web (SPA)",
       "publicClient": true,
       "enabled": true,
       "standardFlowEnabled": true,

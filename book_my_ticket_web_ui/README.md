@@ -1,6 +1,6 @@
-# BMTickets Web UI
+# BookMyTickets Web UI
 
-The customer-facing web app for the BMTickets platform. Users browse movies and live events by city, pick seats on a live 3D seat map, pay, and get an e-ticket with a QR code. Admins manage the catalog from the same app.
+The customer-facing web app for the BookMyTickets platform. Users browse movies and live events by city, pick seats on a live 3D seat map, pay, and get an e-ticket with a QR code. Admins manage the catalog from the same app.
 
 Every screen reads and writes through the platform's microservices via the **API gateway**. The app contains no mock or hard-coded data.
 
@@ -248,7 +248,7 @@ book_my_ticket_web_ui/
 
 | Symptom | Cause and fix |
 |---|---|
-| "Cannot reach BMTickets…" | The gateway is not running on :8080. Run `docker compose ps` and `docker compose logs api-gateway`. Services need about 1-2 minutes to register with Eureka after starting |
+| "Cannot reach BookMyTickets…" | The gateway is not running on :8080. Run `docker compose ps` and `docker compose logs api-gateway`. Services need about 1-2 minutes to register with Eureka after starting |
 | "Nothing playing in Mumbai yet" | The catalog is empty. Run `npm run seed`, or create a show in the **Admin** tab |
 | A show has no seats right after seeding | Seat maps are built asynchronously (Kafka `ShowScheduled` → seat-inventory). Wait a few seconds and refresh |
 | Keycloak says "Invalid parameter: redirect_uri" | The app is not on `http://localhost:3000`. Use port 3000, or add your origin to the `bmtickets-web` client's redirect URIs and web origins |

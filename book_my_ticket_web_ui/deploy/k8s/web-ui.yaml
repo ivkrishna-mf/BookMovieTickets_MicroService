@@ -1,4 +1,4 @@
-# BMTickets web UI on EKS: stateless nginx pods serving the SPA. Same namespace as the platform services.
+# BookMyTickets web UI on EKS: stateless nginx pods serving the SPA. Same namespace as the platform services.
 apiVersion: v1
 kind: ConfigMap
 metadata:

@@ -56,7 +56,7 @@ export function describeError(error: unknown): string {
       const wait = error.retryAfterSeconds ? ` in ${error.retryAfterSeconds}s` : ' shortly';
       return `You're going a little fast. Please retry${wait}.`;
     }
-    if (error.status === 0) return 'Cannot reach BMTickets. Check your connection or that the API gateway is running.';
+    if (error.status === 0) return 'Cannot reach BookMyTickets. Check your connection or that the API gateway is running.';
     if (error.status === 403) return 'You do not have permission to do that.';
     return error.message;
   }

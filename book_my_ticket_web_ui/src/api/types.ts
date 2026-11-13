@@ -1,4 +1,4 @@
-// Mirrors the Java records exposed by the BMTickets services through the API gateway.
+// Mirrors the Java records exposed by the BookMyTickets services through the API gateway.
 
 export interface EventSummary {
   id: string;

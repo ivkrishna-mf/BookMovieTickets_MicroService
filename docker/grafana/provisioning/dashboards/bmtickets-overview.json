@@ -863,7 +863,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "BMTickets - Local Service Health",
+  "title": "BookMyTickets - Local Service Health",
   "uid": "bmtickets-local-health",
   "version": 1,
   "weekStart": ""

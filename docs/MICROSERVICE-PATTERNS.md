@@ -1,4 +1,4 @@
-# BMTickets - Microservice Patterns Catalogue
+# BookMyTickets - Microservice Patterns Catalogue
 
 Every pattern used in the platform, explained as **Problem -> How it is implemented here (with code pointers) ->
 Benefit -> Trade-off**. Paths are relative to the repository root.

@@ -2,7 +2,7 @@
   "name": "book-my-ticket-web-ui",
   "private": true,
   "version": "1.0.0",
-  "description": "BMTickets web UI - browse movies & events and book seats against the BMTickets microservices",
+  "description": "BookMyTickets web UI - browse movies & events and book seats against the BookMyTickets microservices",
   "type": "module",
   "engines": {
     "node": ">=20.11"
